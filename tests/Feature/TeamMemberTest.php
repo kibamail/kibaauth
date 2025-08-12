@@ -180,12 +180,13 @@ describe('Team Member API', function () {
     it('prevents non-workspace owner from creating team member', function () {
         $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
         $workspace = $oauthData['workspace'];
+        $client = $oauthData['client'];
         $team = createTeamInWorkspaceForMembers($workspace);
         $newUser = User::factory()->create();
 
-        // Create another user who is not the workspace owner
+        // Create another user who is not the workspace owner but uses same client
         $otherUser = User::factory()->create();
-        $otherOauthData = createOAuthHeadersForClient($otherUser);
+        $otherOauthData = createOAuthHeadersForClient($otherUser, $client->id);
         $otherHeaders = $otherOauthData['headers'];
 
         $response = $this->withHeaders($otherHeaders)

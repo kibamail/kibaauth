@@ -30,8 +30,11 @@ class StoreTeamMemberRequest extends FormRequest
 
     /**
      * Configure the validator instance.
+     *
+     * @param \Illuminate\Validation\Validator $validator
+     * @return void
      */
-    public function withValidator($validator)
+    public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
             $userId = $this->input('user_id');
@@ -40,6 +43,7 @@ class StoreTeamMemberRequest extends FormRequest
             if (empty($userId) && empty($email)) {
                 $validator->errors()->add('user_id', 'Either user_id or email must be provided.');
                 $validator->errors()->add('email', 'Either user_id or email must be provided.');
+                return;
             }
 
             if (!empty($userId) && !empty($email)) {
@@ -49,11 +53,6 @@ class StoreTeamMemberRequest extends FormRequest
         });
     }
 
-    /**
-     * Get custom error messages for validation rules.
-     *
-     * @return array<string, string>
-     */
     public function messages(): array
     {
         return [

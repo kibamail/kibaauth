@@ -6,7 +6,9 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use App\Models\Client;
+use App\Models\TeamMember;
 use App\Models\Workspace;
+use App\Policies\TeamMemberPolicy;
 use App\Policies\WorkspacePolicy;
 use App\Console\Commands\CreateClientPermission;
 use Laravel\Passport\Passport;
@@ -33,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Workspace::class, WorkspacePolicy::class);
+        Gate::policy(TeamMember::class, TeamMemberPolicy::class);
 
         Passport::useClientModel(Client::class);
 

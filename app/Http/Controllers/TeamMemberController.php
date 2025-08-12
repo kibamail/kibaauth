@@ -2,104 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\Authorization\TeamMemberAuthorization;
 use App\Http\Requests\StoreTeamMemberRequest;
 use App\Models\Team;
 use App\Models\TeamMember;
-use App\Models\User;
 use App\Models\Workspace;
+use App\Services\TeamMemberService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
+
 
 class TeamMemberController extends Controller
 {
-    /**
-     * Store a newly created team member in storage.
-     */
+    public function __construct(
+        private TeamMemberAuthorization $authorization,
+        private TeamMemberService $service
+    ) {}
+
     public function store(StoreTeamMemberRequest $request, Workspace $workspace, Team $team): JsonResponse
     {
-        // Authorize that the user is the workspace owner
-        $this->authorize('update', $workspace);
+        $clientId = $this->authorization->getClientId($request);
+        $user = $request->user();
 
-        $clientId = $this->getClientId($request);
+        $this->authorization->validateContextAndAuthorization($user, $workspace, $team, $clientId);
 
-        // Verify workspace belongs to the client
-        if ($workspace->client_id !== $clientId) {
-            abort(404, 'Workspace not found');
-        }
+        $teamMember = $this->service->createTeamMember($team, $request->validated());
 
-        // Verify team belongs to the workspace
-        if ($team->workspace_id !== $workspace->id) {
-            abort(404, 'Team not found in this workspace');
-        }
-
-        $validated = $request->validated();
-
-        $userId = null;
-        $email = null;
-
-        // Handle user_id or email-based team member creation
-        if (!empty($validated['user_id'])) {
-            // User ID provided - check if user exists
-            $user = User::find($validated['user_id']);
-            if (!$user) {
-                abort(404, 'User not found');
-            }
-            $userId = $validated['user_id'];
-
-            // Check if user is already a member of this team
-            $existingMember = TeamMember::where('team_id', $team->id)
-                ->where('user_id', $userId)
-                ->first();
-
-            if ($existingMember) {
-                throw ValidationException::withMessages([
-                    'user_id' => ['This user is already a member of this team.']
-                ]);
-            }
-        } else {
-            // Email provided - check if user exists with this email
-            $email = $validated['email'];
-            $existingUser = User::where('email', $email)->first();
-
-            if ($existingUser) {
-                // User exists - use their user_id
-                $userId = $existingUser->id;
-                $email = null; // Don't store email when we have user_id
-
-                // Check if user is already a member of this team
-                $existingMember = TeamMember::where('team_id', $team->id)
-                    ->where('user_id', $userId)
-                    ->first();
-
-                if ($existingMember) {
-                    throw ValidationException::withMessages([
-                        'email' => ['A user with this email is already a member of this team.']
-                    ]);
-                }
-            } else {
-                // User doesn't exist - check if email is already invited
-                $existingMember = TeamMember::where('team_id', $team->id)
-                    ->where('email', $email)
-                    ->first();
-
-                if ($existingMember) {
-                    throw ValidationException::withMessages([
-                        'email' => ['This email has already been invited to this team.']
-                    ]);
-                }
-            }
-        }
-
-        // Create the team member
-        $teamMember = TeamMember::create([
-            'team_id' => $team->id,
-            'user_id' => $userId,
-            'email' => $email,
-            'status' => $validated['status'] ?? 'pending',
-        ]);
-
-        // Load the user relationship for response (if user exists)
         if ($teamMember->user_id) {
             $teamMember->load('user');
         }
@@ -110,57 +38,19 @@ class TeamMemberController extends Controller
         ], 201);
     }
 
-    /**
-     * Remove the specified team member from storage.
-     */
     public function destroy(Request $request, Workspace $workspace, Team $team, TeamMember $teamMember): JsonResponse
     {
-        $clientId = $this->getClientId($request);
-        $currentUser = $request->user();
+        $clientId = $this->authorization->getClientId($request);
+        $user = $request->user();
 
-        // Verify workspace belongs to the client
-        if ($workspace->client_id !== $clientId) {
-            abort(404, 'Workspace not found');
-        }
+        $this->authorization->validateDeleteAuthorization($user, $workspace, $team, $teamMember, $clientId);
 
-        // Verify team belongs to the workspace
-        if ($team->workspace_id !== $workspace->id) {
-            abort(404, 'Team not found in this workspace');
-        }
-
-        // Verify team member belongs to the team
-        if ($teamMember->team_id !== $team->id) {
-            abort(404, 'Team member not found in this team');
-        }
-
-        // Authorization: Allow only workspace owner or the team member themselves
-        $isWorkspaceOwner = $workspace->user_id === $currentUser->id;
-        $isTeamMemberSelf = $teamMember->user_id === $currentUser->id;
-
-        if (!$isWorkspaceOwner && !$isTeamMemberSelf) {
-            abort(403, 'You are not authorized to remove this team member');
-        }
-
-        // Delete the team member
-        $teamMember->delete();
+        $this->service->deleteTeamMember($teamMember);
 
         return response()->json([
             'message' => 'Team member removed successfully',
         ], 200);
     }
 
-    /**
-     * Get the client ID from the request token.
-     */
-    protected function getClientId(Request $request): string
-    {
-        $token = $request->user()->token();
-        $clientId = $token->client_id ?? $token->client->id ?? null;
 
-        if (!$clientId) {
-            abort(400, 'Client context not available');
-        }
-
-        return $clientId;
-    }
 }

@@ -13,12 +13,16 @@ class Team extends Model
 {
     use HasFactory;
 
+    public $incrementing = false;
+    protected $keyType = 'string';
+
     /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
      */
     protected $fillable = [
+        'id',
         'name',
         'description',
         'slug',
@@ -33,6 +37,8 @@ class Team extends Model
     protected function casts(): array
     {
         return [
+            'id' => 'string',
+            'workspace_id' => 'string',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -76,7 +82,7 @@ class Team extends Model
      * @param int $workspaceId
      * @return string
      */
-    public static function generateUniqueSlug(string $name, int $workspaceId): string
+    public static function generateUniqueSlug(string $name, string $workspaceId): string
     {
         $baseSlug = Str::slug($name);
         $slug = $baseSlug;
@@ -108,6 +114,9 @@ class Team extends Model
         parent::boot();
 
         static::creating(function ($team) {
+            if (empty($team->id)) {
+                $team->id = (string) Str::uuid();
+            }
             if (empty($team->slug)) {
                 $team->slug = self::generateUniqueSlug($team->name, $team->workspace_id);
             }

@@ -28,7 +28,7 @@ class StoreTeamRequest extends FormRequest
             'description' => 'nullable|string',
             'slug' => 'nullable|string|max:255|alpha_dash',
             'permission_ids' => 'nullable|array',
-            'permission_ids.*' => 'integer|exists:permissions,id',
+            'permission_ids.*' => 'uuid|exists:permissions,id',
         ];
     }
 

@@ -9,10 +9,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('workspaces', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('name');
             $table->string('slug');
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->uuid('user_id');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->char('client_id', 36);
             $table->foreign('client_id')->references('id')->on('oauth_clients')->onDelete('cascade');
             $table->timestamps();

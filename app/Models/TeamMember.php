@@ -10,12 +10,16 @@ class TeamMember extends Model
 {
     use HasFactory;
 
+    public $incrementing = false;
+    protected $keyType = 'string';
+
     /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
      */
     protected $fillable = [
+        'id',
         'team_id',
         'user_id',
         'email',
@@ -30,6 +34,9 @@ class TeamMember extends Model
     protected function casts(): array
     {
         return [
+            'id' => 'string',
+            'team_id' => 'string',
+            'user_id' => 'string',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -107,5 +114,16 @@ class TeamMember extends Model
         }
 
         return $this->email ?? 'Unknown';
+    }
+
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::creating(function ($teamMember) {
+            if (empty($teamMember->id)) {
+                $teamMember->id = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
     }
 }

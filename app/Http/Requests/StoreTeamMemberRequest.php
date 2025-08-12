@@ -22,7 +22,7 @@ class StoreTeamMemberRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user_id' => 'nullable|integer|exists:users,id',
+            'user_id' => 'nullable|uuid|exists:users,id',
             'email' => 'nullable|email|max:255',
             'status' => 'sometimes|string|in:active,pending',
         ];
@@ -57,7 +57,7 @@ class StoreTeamMemberRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'user_id.integer' => 'The user ID must be an integer.',
+            'user_id.uuid' => 'The user ID must be a valid UUID.',
             'user_id.exists' => 'The specified user does not exist.',
             'email.email' => 'The email must be a valid email address.',
             'email.max' => 'The email may not be greater than 255 characters.',

@@ -209,7 +209,7 @@ class TeamController extends Controller
 
         $validated = $request->validate([
             'permission_ids' => 'required|array',
-            'permission_ids.*' => 'integer|exists:permissions,id',
+            'permission_ids.*' => 'uuid|exists:permissions,id',
         ]);
 
         // Validate that all permissions belong to the same client

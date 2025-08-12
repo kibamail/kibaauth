@@ -12,12 +12,16 @@ class Permission extends Model
 {
     use HasFactory;
 
+    public $incrementing = false;
+    protected $keyType = 'string';
+
     /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
      */
     protected $fillable = [
+        'id',
         'name',
         'description',
         'slug',
@@ -32,6 +36,7 @@ class Permission extends Model
     protected function casts(): array
     {
         return [
+            'id' => 'string',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -87,6 +92,9 @@ class Permission extends Model
         parent::boot();
 
         static::creating(function ($permission) {
+            if (empty($permission->id)) {
+                $permission->id = (string) Str::uuid();
+            }
             if (!empty($permission->client_id)) {
                 if (empty($permission->slug)) {
                     $permission->slug = self::generateUniqueSlug($permission->name, $permission->client_id);

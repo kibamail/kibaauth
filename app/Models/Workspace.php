@@ -12,8 +12,12 @@ class Workspace extends Model
 {
     use HasFactory;
 
+    public $incrementing = false;
+    protected $keyType = 'string';
+
 
     protected $fillable = [
+        'id',
         'name',
         'slug',
         'user_id',
@@ -24,6 +28,8 @@ class Workspace extends Model
     protected function casts(): array
     {
         return [
+            'id' => 'string',
+            'user_id' => 'string',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -73,6 +79,9 @@ class Workspace extends Model
         parent::boot();
 
         static::creating(function ($workspace) {
+            if (empty($workspace->id)) {
+                $workspace->id = (string) Str::uuid();
+            }
             if (empty($workspace->slug)) {
                 $workspace->slug = self::generateUniqueSlug($workspace->name, $workspace->client_id);
             }

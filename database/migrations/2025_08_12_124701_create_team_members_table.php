@@ -12,9 +12,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('team_members', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('team_id')->constrained()->onDelete('cascade');
-            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
+            $table->uuid('id')->primary();
+            $table->uuid('team_id');
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->uuid('user_id')->nullable();
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->string('email')->nullable();
             $table->enum('status', ['active', 'pending'])->default('pending');
             $table->timestamps();

@@ -28,7 +28,7 @@ class UpdateTeamRequest extends FormRequest
             'description' => 'sometimes|nullable|string',
             'slug' => 'sometimes|required|string|max:255|alpha_dash',
             'permission_ids' => 'sometimes|nullable|array',
-            'permission_ids.*' => 'integer|exists:permissions,id',
+            'permission_ids.*' => 'uuid|exists:permissions,id',
         ];
     }
 

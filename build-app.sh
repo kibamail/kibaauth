@@ -8,7 +8,7 @@ set -e
 npm run build
 
 # Run migrations
-php artisan migrate
+php artisan migrate --force
 
 # Clear cache
 php artisan optimize:clear

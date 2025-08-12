@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class Team extends Model
@@ -56,6 +57,16 @@ class Team extends Model
     {
         return $this->belongsToMany(Permission::class, 'team_permission')
             ->withTimestamps();
+    }
+
+    /**
+     * Get the team members for the team.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\TeamMember>
+     */
+    public function teamMembers(): HasMany
+    {
+        return $this->hasMany(TeamMember::class);
     }
 
     /**

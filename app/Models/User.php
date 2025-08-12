@@ -54,4 +54,12 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(Workspace::class);
     }
+
+    /**
+     * Get the team memberships for the user.
+     */
+    public function teamMembers(): HasMany
+    {
+        return $this->hasMany(TeamMember::class);
+    }
 }

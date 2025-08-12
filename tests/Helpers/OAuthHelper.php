@@ -43,22 +43,31 @@ function createOAuthHeaders(User $user, string $password = 'password'): array
 
 /**
  * Create OAuth2 authorization headers for a specific client
- * This creates a new password grant client for the given user
+ * This creates a new password grant client for the given user, or uses an existing one
  *
  * @param User $user The user to authenticate
+ * @param string|null $clientId Optional existing client ID to use
  * @param string $password The user's password (defaults to 'password')
  * @return array ['headers' => auth headers, 'client' => client instance]
  */
-function createOAuthHeadersForClient(User $user, string $password = 'password'): array
+function createOAuthHeadersForClient(User $user, ?string $clientId = null, string $password = 'password'): array
 {
-    // Create a password grant client
-    $clientRepository = new ClientRepository();
-    $client = $clientRepository->createPasswordGrantClient(
-        'Test Password Grant Client',
-        $user->getProviderName()
-    );
+    if ($clientId) {
+        // Use existing client
+        $client = \App\Models\Client::find($clientId);
+        if (!$client) {
+            throw new \Exception("Client with ID {$clientId} not found");
+        }
+    } else {
+        // Create a password grant client
+        $clientRepository = new ClientRepository();
+        $client = $clientRepository->createPasswordGrantClient(
+            'Test Password Grant Client',
+            $user->getProviderName()
+        );
+    }
 
-    // Make OAuth2 token request with the created client
+    // Make OAuth2 token request with the client
     $response = test()->postJson('/oauth/token', [
         'grant_type' => 'password',
         'client_id' => $client->id,

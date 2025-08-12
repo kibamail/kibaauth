@@ -111,6 +111,45 @@ class TeamMemberController extends Controller
     }
 
     /**
+     * Remove the specified team member from storage.
+     */
+    public function destroy(Request $request, Workspace $workspace, Team $team, TeamMember $teamMember): JsonResponse
+    {
+        $clientId = $this->getClientId($request);
+        $currentUser = $request->user();
+
+        // Verify workspace belongs to the client
+        if ($workspace->client_id !== $clientId) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Verify team belongs to the workspace
+        if ($team->workspace_id !== $workspace->id) {
+            abort(404, 'Team not found in this workspace');
+        }
+
+        // Verify team member belongs to the team
+        if ($teamMember->team_id !== $team->id) {
+            abort(404, 'Team member not found in this team');
+        }
+
+        // Authorization: Allow only workspace owner or the team member themselves
+        $isWorkspaceOwner = $workspace->user_id === $currentUser->id;
+        $isTeamMemberSelf = $teamMember->user_id === $currentUser->id;
+
+        if (!$isWorkspaceOwner && !$isTeamMemberSelf) {
+            abort(403, 'You are not authorized to remove this team member');
+        }
+
+        // Delete the team member
+        $teamMember->delete();
+
+        return response()->json([
+            'message' => 'Team member removed successfully',
+        ], 200);
+    }
+
+    /**
      * Get the client ID from the request token.
      */
     protected function getClientId(Request $request): string

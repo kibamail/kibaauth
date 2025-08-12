@@ -546,9 +546,7 @@ describe('Team Member API', function () {
 
     it('requires authentication', function () {
         $user = User::factory()->create();
-        $oauthData = createOAuthHeadersForClient($user);
-        $client = $oauthData['client'];
-
+        $client = \App\Models\Client::factory()->create();
         $workspace = Workspace::factory()->create([
             'user_id' => $user->id,
             'client_id' => $client->id,
@@ -560,6 +558,183 @@ describe('Team Member API', function () {
             'user_id' => $newUser->id,
             'status' => 'active',
         ]);
+
+        $response->assertStatus(401);
+    });
+
+    it('allows workspace owner to remove team member', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $headers = $oauthData['headers'];
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+        $memberUser = User::factory()->create();
+
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $memberUser->id,
+            'status' => 'active',
+        ]);
+
+        $response = $this->withHeaders($headers)
+            ->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Team member removed successfully',
+            ]);
+
+        $this->assertDatabaseMissing('team_members', [
+            'id' => $teamMember->id,
+        ]);
+    });
+
+    it('allows team member to remove themselves', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $client = $oauthData['client'];
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+
+        // Create another user who will be the team member
+        $memberUser = User::factory()->create();
+        $memberOauthData = createOAuthHeadersForClient($memberUser, $client->id);
+        $memberHeaders = $memberOauthData['headers'];
+
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $memberUser->id,
+            'status' => 'active',
+        ]);
+
+        $response = $this->withHeaders($memberHeaders)
+            ->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Team member removed successfully',
+            ]);
+
+        $this->assertDatabaseMissing('team_members', [
+            'id' => $teamMember->id,
+        ]);
+    });
+
+    it('prevents non-authorized user from removing team member', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $client = $oauthData['client'];
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+
+        // Create two other users
+        $memberUser = User::factory()->create();
+        $unauthorizedUser = User::factory()->create();
+        $unauthorizedOauthData = createOAuthHeadersForClient($unauthorizedUser, $client->id);
+        $unauthorizedHeaders = $unauthorizedOauthData['headers'];
+
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $memberUser->id,
+            'status' => 'active',
+        ]);
+
+        $response = $this->withHeaders($unauthorizedHeaders)
+            ->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}");
+
+        $response->assertStatus(403);
+
+        $this->assertDatabaseHas('team_members', [
+            'id' => $teamMember->id,
+        ]);
+    });
+
+    it('prevents removing team member from different workspace', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $headers = $oauthData['headers'];
+        $client = $oauthData['client'];
+
+        // Create two workspaces
+        $workspace1 = $oauthData['workspace'];
+        $workspace2 = Workspace::factory()->create([
+            'user_id' => $this->user->id,
+            'client_id' => $client->id,
+        ]);
+
+        $team1 = createTeamInWorkspaceForMembers($workspace1);
+        $team2 = createTeamInWorkspaceForMembers($workspace2);
+
+        $memberUser = User::factory()->create();
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team2->id,
+            'user_id' => $memberUser->id,
+            'status' => 'active',
+        ]);
+
+        $response = $this->withHeaders($headers)
+            ->deleteJson("/api/workspaces/{$workspace1->id}/teams/{$team1->id}/members/{$teamMember->id}");
+
+        $response->assertStatus(404);
+
+        $this->assertDatabaseHas('team_members', [
+            'id' => $teamMember->id,
+        ]);
+    });
+
+    it('prevents removing team member from different client', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+
+        // Create different client and headers
+        $differentOauthData = createOAuthHeadersForClient($this->user);
+        $differentHeaders = $differentOauthData['headers'];
+
+        $memberUser = User::factory()->create();
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $memberUser->id,
+            'status' => 'active',
+        ]);
+
+        $response = $this->withHeaders($differentHeaders)
+            ->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}");
+
+        $response->assertStatus(404);
+
+        $this->assertDatabaseHas('team_members', [
+            'id' => $teamMember->id,
+        ]);
+    });
+
+    it('returns 404 when team member does not exist', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $headers = $oauthData['headers'];
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+
+        $nonExistentId = (string) \Illuminate\Support\Str::uuid();
+
+        $response = $this->withHeaders($headers)
+            ->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$nonExistentId}");
+
+        $response->assertStatus(404);
+    });
+
+    it('requires authentication for delete', function () {
+        $user = User::factory()->create();
+        $client = \App\Models\Client::factory()->create();
+        $workspace = Workspace::factory()->create([
+            'user_id' => $user->id,
+            'client_id' => $client->id,
+        ]);
+        $team = createTeamInWorkspaceForMembers($workspace);
+        $memberUser = User::factory()->create();
+
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $memberUser->id,
+            'status' => 'active',
+        ]);
+
+        $response = $this->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}");
 
         $response->assertStatus(401);
     });

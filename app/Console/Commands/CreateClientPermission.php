@@ -66,6 +66,9 @@ class CreateClientPermission extends Command
             'client_id' => $client->id,
         ]);
 
+        // Auto-attach the new permission to all "Administrators" teams for this client
+        $this->attachPermissionToAdministratorTeams($permission, $client);
+
         $this->info("Permission created successfully!");
         $this->table(
             ['Field', 'Value'],
@@ -115,5 +118,25 @@ class CreateClientPermission extends Command
             ['ID', 'Name'],
             $clients->map(fn($client) => [$client->id, $client->name])->toArray()
         );
+    }
+
+    /**
+     * Attach the permission to all "Administrators" teams for this client.
+     */
+    protected function attachPermissionToAdministratorTeams(Permission $permission, Client $client): void
+    {
+        // Find all workspaces for this client
+        $workspaces = $client->workspaces;
+
+        foreach ($workspaces as $workspace) {
+            // Find the "Administrators" team in each workspace
+            $adminTeam = $workspace->teams()->where('name', 'Administrators')->first();
+
+            if ($adminTeam) {
+                // Attach the permission to the Administrators team
+                $adminTeam->permissions()->attach($permission->id);
+                $this->info("Permission attached to Administrators team in workspace: {$workspace->name}");
+            }
+        }
     }
 }

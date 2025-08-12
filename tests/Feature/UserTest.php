@@ -131,25 +131,29 @@ describe('User API', function () {
                             'name' => $workspace->name,
                             'user_id' => $this->user->id,
                             'client_id' => $client->id,
-                            'teams' => [
-                                [
-                                    'id' => $team->id,
-                                    'name' => $team->name,
-                                    'workspace_id' => $workspace->id,
-                                ]
-                            ]
                         ]
                     ]
                 ]
             ]);
 
-        // Verify team members are included
-        $responseData = $response->json('data.workspaces.0.teams.0.team_members');
-        expect($responseData)->toHaveCount(2);
+        // Verify we have 2 teams (1 manual + 1 auto-created Administrators)
+        $responseTeams = $response->json('data.workspaces.0.teams');
+        expect($responseTeams)->toHaveCount(2);
 
-        // Verify permissions are included
-        $responsePermissions = $response->json('data.workspaces.0.teams.0.permissions');
-        expect($responsePermissions)->toHaveCount(2);
+        // Find the manually created team
+        $manualTeam = collect($responseTeams)->firstWhere('id', $team->id);
+        expect($manualTeam)->not->toBeNull();
+
+        // Verify team members are included in the manual team
+        expect($manualTeam['team_members'])->toHaveCount(2);
+
+        // Verify permissions are included in the manual team
+        expect($manualTeam['permissions'])->toHaveCount(2);
+
+        // Verify Administrators team exists and has 8 default permissions
+        $adminTeam = collect($responseTeams)->firstWhere('name', 'Administrators');
+        expect($adminTeam)->not->toBeNull();
+        expect($adminTeam['permissions'])->toHaveCount(8);
     });
 
     it('returns authenticated user with workspaces where they are team members', function () {
@@ -189,17 +193,23 @@ describe('User API', function () {
                             'name' => $workspace->name,
                             'user_id' => $workspaceOwner->id,
                             'client_id' => $client->id,
-                            'teams' => [
-                                [
-                                    'id' => $team->id,
-                                    'name' => $team->name,
-                                    'workspace_id' => $workspace->id,
-                                ]
-                            ]
                         ]
                     ]
                 ]
             ]);
+
+        // Verify we have 2 teams (1 manual + 1 auto-created Administrators)
+        $responseTeams = $response->json('data.workspaces.0.teams');
+        expect($responseTeams)->toHaveCount(2);
+
+        // Find the manually created team
+        $manualTeam = collect($responseTeams)->firstWhere('id', $team->id);
+        expect($manualTeam)->not->toBeNull();
+        expect($manualTeam['name'])->toBe($team->name);
+
+        // Verify Administrators team exists
+        $adminTeam = collect($responseTeams)->firstWhere('name', 'Administrators');
+        expect($adminTeam)->not->toBeNull();
     });
 
     it('combines owned workspaces and member workspaces without duplicates', function () {
@@ -319,7 +329,12 @@ describe('User API', function () {
 
         $response->assertStatus(200);
 
-        $teamMembers = $response->json('data.workspaces.0.teams.0.team_members');
+        // Find the manual team (not Administrators team)
+        $responseTeams = $response->json('data.workspaces.0.teams');
+        $manualTeam = collect($responseTeams)->firstWhere('id', $team->id);
+        expect($manualTeam)->not->toBeNull();
+
+        $teamMembers = $manualTeam['team_members'];
         expect($teamMembers)->toHaveCount(2);
 
         $emailOnlyMember = collect($teamMembers)->firstWhere('email', 'invited@example.com');
@@ -404,7 +419,7 @@ describe('User API', function () {
         $response->assertStatus(200);
 
         $teams = $response->json('data.workspaces.0.teams');
-        expect($teams)->toHaveCount(2);
+        expect($teams)->toHaveCount(3); // 2 manual teams + 1 auto-created Administrators team
 
         $teamIds = collect($teams)->pluck('id')->toArray();
         expect($teamIds)->toContain($team1->id);

@@ -62,6 +62,192 @@ describe('Team Member API', function () {
         ]);
     });
 
+    it('allows user with teamMembers:create permission to create team member', function () {
+        // Create workspace owner
+        $workspaceOwner = User::factory()->create();
+        $oauthData = createOAuthHeadersForClient($workspaceOwner);
+        $client = $oauthData['client'];
+
+        $workspace = Workspace::factory()->create([
+            'user_id' => $workspaceOwner->id,
+            'client_id' => $client->id,
+        ]);
+
+        $team = Team::factory()->create([
+            'workspace_id' => $workspace->id,
+        ]);
+
+        // Create a different user who will have team member creation permission
+        $memberCreator = User::factory()->create();
+        $creatorOauthData = createOAuthHeadersForClient($memberCreator, $client->id);
+        $creatorHeaders = $creatorOauthData['headers'];
+
+        // Get the Administrators team (auto-created) and add the user to it
+        $adminTeam = $workspace->teams()->where('name', 'Administrators')->first();
+        TeamMember::factory()->create([
+            'team_id' => $adminTeam->id,
+            'user_id' => $memberCreator->id,
+            'status' => 'active',
+        ]);
+
+        // User to be added as team member
+        $targetUser = User::factory()->create();
+
+        $response = $this->postJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members", [
+            'user_id' => $targetUser->id,
+            'status' => 'active',
+        ], $creatorHeaders);
+
+        $response->assertStatus(201)
+            ->assertJsonFragment([
+                'user_id' => $targetUser->id,
+                'status' => 'active',
+                'team_id' => $team->id,
+            ]);
+
+        $this->assertDatabaseHas('team_members', [
+            'user_id' => $targetUser->id,
+            'team_id' => $team->id,
+            'status' => 'active',
+        ]);
+    });
+
+    it('allows user with teamMembers:delete permission to delete team member', function () {
+        // Create workspace owner
+        $workspaceOwner = User::factory()->create();
+        $oauthData = createOAuthHeadersForClient($workspaceOwner);
+        $client = $oauthData['client'];
+
+        $workspace = Workspace::factory()->create([
+            'user_id' => $workspaceOwner->id,
+            'client_id' => $client->id,
+        ]);
+
+        $team = Team::factory()->create([
+            'workspace_id' => $workspace->id,
+        ]);
+
+        // Create target user to be removed
+        $targetUser = User::factory()->create();
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $targetUser->id,
+            'status' => 'active',
+        ]);
+
+        // Create a different user who will have team member delete permission
+        $memberDeleter = User::factory()->create();
+        $deleterOauthData = createOAuthHeadersForClient($memberDeleter, $client->id);
+        $deleterHeaders = $deleterOauthData['headers'];
+
+        // Get the Administrators team (auto-created) and add the user to it
+        $adminTeam = $workspace->teams()->where('name', 'Administrators')->first();
+        TeamMember::factory()->create([
+            'team_id' => $adminTeam->id,
+            'user_id' => $memberDeleter->id,
+            'status' => 'active',
+        ]);
+
+        $response = $this->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}", [], $deleterHeaders);
+
+        $response->assertStatus(200)
+            ->assertJsonFragment([
+                'message' => 'Team member removed successfully',
+            ]);
+
+        $this->assertDatabaseMissing('team_members', [
+            'id' => $teamMember->id,
+        ]);
+    });
+
+    it('prevents user without teamMembers:create permission from creating team member', function () {
+        // Create workspace owner
+        $workspaceOwner = User::factory()->create();
+        $oauthData = createOAuthHeadersForClient($workspaceOwner);
+        $client = $oauthData['client'];
+
+        $workspace = Workspace::factory()->create([
+            'user_id' => $workspaceOwner->id,
+            'client_id' => $client->id,
+        ]);
+
+        $team = Team::factory()->create([
+            'workspace_id' => $workspace->id,
+        ]);
+
+        // Create a user with same client but no teamMembers:create permission
+        $unauthorizedUser = User::factory()->create();
+        $unauthorizedOauthData = createOAuthHeadersForClient($unauthorizedUser, $client->id);
+        $unauthorizedHeaders = $unauthorizedOauthData['headers'];
+
+        // Create a team without teamMembers:create permission and add user to it
+        $regularTeam = Team::factory()->create([
+            'workspace_id' => $workspace->id,
+            'name' => 'Regular Team',
+        ]);
+
+        TeamMember::factory()->create([
+            'team_id' => $regularTeam->id,
+            'user_id' => $unauthorizedUser->id,
+            'status' => 'active',
+        ]);
+
+        // User to be added as team member
+        $targetUser = User::factory()->create();
+
+        $response = $this->postJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members", [
+            'user_id' => $targetUser->id,
+            'status' => 'active',
+        ], $unauthorizedHeaders);
+
+        $response->assertStatus(403);
+    });
+
+    it('prevents user without teamMembers:delete permission from deleting team member', function () {
+        // Create workspace owner
+        $workspaceOwner = User::factory()->create();
+        $oauthData = createOAuthHeadersForClient($workspaceOwner);
+        $client = $oauthData['client'];
+
+        $workspace = Workspace::factory()->create([
+            'user_id' => $workspaceOwner->id,
+            'client_id' => $client->id,
+        ]);
+
+        $team = Team::factory()->create([
+            'workspace_id' => $workspace->id,
+        ]);
+
+        // Create target user to be removed
+        $targetUser = User::factory()->create();
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $targetUser->id,
+            'status' => 'active',
+        ]);
+
+        // Create a user with same client but no teamMembers:delete permission
+        $unauthorizedUser = User::factory()->create();
+        $unauthorizedOauthData = createOAuthHeadersForClient($unauthorizedUser, $client->id);
+        $unauthorizedHeaders = $unauthorizedOauthData['headers'];
+
+        // Create a team without teamMembers:delete permission and add user to it
+        $regularTeam = Team::factory()->create([
+            'workspace_id' => $workspace->id,
+            'name' => 'Regular Team',
+        ]);
+
+        TeamMember::factory()->create([
+            'team_id' => $regularTeam->id,
+            'user_id' => $unauthorizedUser->id,
+            'status' => 'active',
+        ]);
+
+        $response = $this->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}", [], $unauthorizedHeaders);
+
+        $response->assertStatus(403);
+    });
+
     it('allows workspace owner to create team member with pending status', function () {
         $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
         $headers = $oauthData['headers'];

@@ -34,4 +34,32 @@ class TeamAuthorization
 
         return $clientId;
     }
+
+    /**
+     * Check if user has specific permission in workspace through team membership
+     */
+    public function userHasPermissionInWorkspace(User $user, Workspace $workspace, string $permissionSlug): bool
+    {
+        // Check if user is workspace owner (always has all permissions)
+        if ($user->id === $workspace->user_id) {
+            return true;
+        }
+
+        // Check if user is a team member in any team that has the required permission
+        $userTeams = $workspace->teams()
+            ->whereHas('teamMembers', function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                      ->where('status', 'active');
+            })
+            ->with('permissions')
+            ->get();
+
+        foreach ($userTeams as $team) {
+            if ($team->permissions->contains('slug', $permissionSlug)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

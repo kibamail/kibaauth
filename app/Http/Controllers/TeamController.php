@@ -26,10 +26,13 @@ class TeamController extends Controller
 
     public function index(Request $request, Workspace $workspace): JsonResponse
     {
-        $this->authorize('view', $workspace);
-
         $clientId = $this->authorization->getClientId($request);
         $this->authorization->validateWorkspaceContext($workspace, $clientId);
+
+        // Check if user has teams:view permission or is workspace owner
+        if (!$this->authorization->userHasPermissionInWorkspace($request->user(), $workspace, 'teams:view')) {
+            abort(403, 'You do not have permission to view teams in this workspace');
+        }
 
         $teams = $workspace->teams()
             ->with('permissions')
@@ -43,10 +46,13 @@ class TeamController extends Controller
 
     public function store(StoreTeamRequest $request, Workspace $workspace): JsonResponse
     {
-        $this->authorize('update', $workspace);
-
         $clientId = $this->authorization->getClientId($request);
         $this->authorization->validateWorkspaceContext($workspace, $clientId);
+
+        // Check if user has teams:create permission or is workspace owner
+        if (!$this->authorization->userHasPermissionInWorkspace($request->user(), $workspace, 'teams:create')) {
+            abort(403, 'You do not have permission to create teams in this workspace');
+        }
 
         $team = $this->service->createTeam($workspace, $request->validated());
 
@@ -60,11 +66,14 @@ class TeamController extends Controller
 
     public function show(Request $request, Workspace $workspace, Team $team): JsonResponse
     {
-        $this->authorize('view', $workspace);
-
         $clientId = $this->authorization->getClientId($request);
         $this->authorization->validateWorkspaceContext($workspace, $clientId);
         $this->authorization->validateTeamContext($team, $workspace);
+
+        // Check if user has teams:view permission or is workspace owner
+        if (!$this->authorization->userHasPermissionInWorkspace($request->user(), $workspace, 'teams:view')) {
+            abort(403, 'You do not have permission to view teams in this workspace');
+        }
 
         $team->load('permissions');
 
@@ -75,11 +84,14 @@ class TeamController extends Controller
 
     public function update(UpdateTeamRequest $request, Workspace $workspace, Team $team): JsonResponse
     {
-        $this->authorize('update', $workspace);
-
         $clientId = $this->authorization->getClientId($request);
         $this->authorization->validateWorkspaceContext($workspace, $clientId);
         $this->authorization->validateTeamContext($team, $workspace);
+
+        // Check if user has teams:update permission or is workspace owner
+        if (!$this->authorization->userHasPermissionInWorkspace($request->user(), $workspace, 'teams:update')) {
+            abort(403, 'You do not have permission to update teams in this workspace');
+        }
 
         $team = $this->service->updateTeam($team, $workspace, $request->validated());
 
@@ -93,11 +105,14 @@ class TeamController extends Controller
 
     public function destroy(Request $request, Workspace $workspace, Team $team): JsonResponse
     {
-        $this->authorize('update', $workspace);
-
         $clientId = $this->authorization->getClientId($request);
         $this->authorization->validateWorkspaceContext($workspace, $clientId);
         $this->authorization->validateTeamContext($team, $workspace);
+
+        // Check if user has teams:delete permission or is workspace owner
+        if (!$this->authorization->userHasPermissionInWorkspace($request->user(), $workspace, 'teams:delete')) {
+            abort(403, 'You do not have permission to delete teams in this workspace');
+        }
 
         $this->service->deleteTeam($team);
 
@@ -108,11 +123,14 @@ class TeamController extends Controller
 
     public function syncPermissions(Request $request, Workspace $workspace, Team $team): JsonResponse
     {
-        $this->authorize('update', $workspace);
-
         $clientId = $this->authorization->getClientId($request);
         $this->authorization->validateWorkspaceContext($workspace, $clientId);
         $this->authorization->validateTeamContext($team, $workspace);
+
+        // Check if user has teams:update permission or is workspace owner
+        if (!$this->authorization->userHasPermissionInWorkspace($request->user(), $workspace, 'teams:update')) {
+            abort(403, 'You do not have permission to update team permissions in this workspace');
+        }
 
         $validated = $request->validate([
             'permission_ids' => 'required|array',

@@ -20,8 +20,8 @@ class TeamMemberAuthorization
         }
 
         // Check authorization before context validation for better error messages
-        if (!$this->isWorkspaceOwner($user, $workspace)) {
-            abort(403, 'You are not authorized to perform this action');
+        if (!$this->userHasPermissionInWorkspace($user, $workspace, 'teamMembers:create')) {
+            abort(403, 'You do not have permission to create team members in this workspace');
         }
 
         // Check team belongs to workspace - if user is authorized but team doesn't belong, it's still a 403
@@ -48,7 +48,9 @@ class TeamMemberAuthorization
         }
 
         // Finally check authorization
-        if (!$this->isWorkspaceOwner($user, $workspace) && !$this->isTeamMemberSelf($user, $teamMember)) {
+        if (!$this->isWorkspaceOwner($user, $workspace) &&
+            !$this->isTeamMemberSelf($user, $teamMember) &&
+            !$this->userHasPermissionInWorkspace($user, $workspace, 'teamMembers:delete')) {
             abort(403, 'You are not authorized to remove this team member');
         }
     }
@@ -109,5 +111,33 @@ class TeamMemberAuthorization
     private function teamMemberBelongsToTeam(TeamMember $teamMember, Team $team): bool
     {
         return $teamMember->team_id === $team->id;
+    }
+
+    /**
+     * Check if user has specific permission in workspace through team membership
+     */
+    public function userHasPermissionInWorkspace(User $user, Workspace $workspace, string $permissionSlug): bool
+    {
+        // Check if user is workspace owner (always has all permissions)
+        if ($user->id === $workspace->user_id) {
+            return true;
+        }
+
+        // Check if user is a team member in any team that has the required permission
+        $userTeams = $workspace->teams()
+            ->whereHas('teamMembers', function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                      ->where('status', 'active');
+            })
+            ->with('permissions')
+            ->get();
+
+        foreach ($userTeams as $team) {
+            if ($team->permissions->contains('slug', $permissionSlug)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

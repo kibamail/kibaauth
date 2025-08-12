@@ -2,6 +2,8 @@
 
 use App\Models\Client;
 use App\Models\Permission;
+use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\Artisan;
 
 beforeEach(function () {
@@ -108,8 +110,9 @@ describe('Permission Model', function () {
     it('can be accessed through client relationship', function () {
         $permission = Permission::factory()->forClient($this->client)->create();
 
-        expect($this->client->permissions)->toHaveCount(1);
-        expect($this->client->permissions->first()->id)->toBe($permission->id);
+        // Client automatically gets 8 default permissions + 1 created = 9 total
+        expect($this->client->permissions)->toHaveCount(9);
+        expect($this->client->permissions->where('id', $permission->id))->toHaveCount(1);
     });
 });
 
@@ -364,10 +367,10 @@ describe('List Client Permissions Command', function () {
         expect($output)->toContain('Write Users');
         expect($output)->toContain('read-users');
         expect($output)->toContain('write-users');
-        expect($output)->toContain('Total permissions: 2');
+        expect($output)->toContain('Total permissions: 10');
     });
 
-    it('shows message when client has no permissions', function () {
+    it('shows client with only default permissions', function () {
         $exitCode = Artisan::call('client:permissions', [
             'client' => 'Test Client',
         ]);
@@ -375,8 +378,10 @@ describe('List Client Permissions Command', function () {
         expect($exitCode)->toBe(0);
 
         $output = Artisan::output();
-        expect($output)->toContain('No permissions found for client: Test Client');
-        expect($output)->toContain("Use 'php artisan client:permission' to create permissions.");
+        expect($output)->toContain('Permissions for client: Test Client');
+        expect($output)->toContain('Total permissions: 8');
+        expect($output)->toContain('teams:create');
+        expect($output)->toContain('teamMembers:view');
     });
 
     it('fails when client does not exist for list command', function () {
@@ -404,7 +409,7 @@ describe('List Client Permissions Command', function () {
 
         $output = Artisan::output();
         expect($output)->toContain('Admin Permission');
-        expect($output)->toContain('Total permissions: 1');
+        expect($output)->toContain('Total permissions: 9');
     });
 
     it('orders permissions by creation date descending', function () {
@@ -424,5 +429,56 @@ describe('List Client Permissions Command', function () {
         $firstPos = strpos($output, 'First Permission');
         $secondPos = strpos($output, 'Second Permission');
         expect($secondPos)->toBeLessThan($firstPos);
+    });
+
+    it('automatically attaches new permissions to existing Administrators teams', function () {
+        // Create a workspace which will have an Administrators team
+        $workspace1 = Workspace::factory()->create([
+            'user_id' => User::factory()->create()->id,
+            'client_id' => $this->client->id,
+        ]);
+
+        $workspace2 = Workspace::factory()->create([
+            'user_id' => User::factory()->create()->id,
+            'client_id' => $this->client->id,
+        ]);
+
+        // Verify Administrators teams exist and have 8 default permissions
+        $adminTeam1 = $workspace1->teams()->where('name', 'Administrators')->first();
+        $adminTeam2 = $workspace2->teams()->where('name', 'Administrators')->first();
+
+        expect($adminTeam1)->not->toBeNull();
+        expect($adminTeam2)->not->toBeNull();
+        expect($adminTeam1->permissions)->toHaveCount(8);
+        expect($adminTeam2->permissions)->toHaveCount(8);
+
+        // Create a new permission via command
+        $exitCode = Artisan::call('client:permission', [
+            'client' => $this->client->id,
+            'name' => 'Custom Permission',
+            '--description' => 'A custom permission for testing',
+        ]);
+
+        expect($exitCode)->toBe(0);
+
+        // Verify the permission was created
+        $newPermission = Permission::where('client_id', $this->client->id)
+            ->where('name', 'Custom Permission')
+            ->first();
+        expect($newPermission)->not->toBeNull();
+
+        // Verify the permission was automatically attached to both Administrators teams
+        $adminTeam1->refresh();
+        $adminTeam2->refresh();
+
+        expect($adminTeam1->permissions)->toHaveCount(9); // 8 default + 1 new
+        expect($adminTeam2->permissions)->toHaveCount(9); // 8 default + 1 new
+
+        expect($adminTeam1->permissions->contains('id', $newPermission->id))->toBeTrue();
+        expect($adminTeam2->permissions->contains('id', $newPermission->id))->toBeTrue();
+
+        // Verify command output mentions the attachment
+        $output = Artisan::output();
+        expect($output)->toContain('Permission attached to Administrators team in workspace:');
     });
 });

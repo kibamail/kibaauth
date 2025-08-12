@@ -99,8 +99,11 @@ class Permission extends Model
                 if (empty($permission->slug)) {
                     $permission->slug = self::generateUniqueSlug($permission->name, $permission->client_id);
                 } else {
-                    // If slug is provided, ensure it's unique for this client
-                    $permission->slug = self::generateUniqueSlug($permission->slug, $permission->client_id);
+                    // If slug is provided, check if it's unique, but preserve exact format if available
+                    if (self::where('slug', $permission->slug)->where('client_id', $permission->client_id)->exists()) {
+                        $permission->slug = self::generateUniqueSlug($permission->slug, $permission->client_id);
+                    }
+                    // Otherwise keep the provided slug as-is
                 }
             }
         });

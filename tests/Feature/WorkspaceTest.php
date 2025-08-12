@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\Client;
+use App\Models\Permission;
 use Laravel\Passport\Passport;
 use Laravel\Passport\Token;
 
@@ -632,5 +633,68 @@ describe('Workspace Model', function () {
         expect($client2Workspaces)->toHaveCount(1);
         expect($client1Workspaces->first()->id)->toBe($workspace1->id);
         expect($client2Workspaces->first()->id)->toBe($workspace2->id);
+    });
+
+    it('automatically creates Administrators team when workspace is created', function () {
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
+
+        $response = $this->postJson('/api/workspaces', [
+            'name' => 'Test Workspace',
+        ], $headers);
+
+        $response->assertStatus(201);
+        $workspaceId = $response->json('data.id');
+
+        // Assert that Administrators team was created
+        $this->assertDatabaseHas('teams', [
+            'name' => 'Administrators',
+            'workspace_id' => $workspaceId,
+            'description' => 'Default administrators team with full permissions',
+        ]);
+
+        // Verify the team exists through relationship
+        $workspace = Workspace::find($workspaceId);
+        $adminTeam = $workspace->teams()->where('name', 'Administrators')->first();
+        expect($adminTeam)->not->toBeNull();
+        expect($adminTeam->name)->toBe('Administrators');
+        expect($adminTeam->slug)->toBe('administrators');
+    });
+
+    it('automatically attaches all client permissions to Administrators team', function () {
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
+
+        $response = $this->postJson('/api/workspaces', [
+            'name' => 'Test Workspace',
+        ], $headers);
+
+        $response->assertStatus(201);
+        $workspaceId = $response->json('data.id');
+
+        // Get the Administrators team
+        $workspace = Workspace::find($workspaceId);
+        $adminTeam = $workspace->teams()->where('name', 'Administrators')->first();
+        expect($adminTeam)->not->toBeNull();
+
+        // Assert that all client permissions are attached to the team
+        $clientPermissions = Permission::where('client_id', $client->id)->get();
+        $teamPermissions = $adminTeam->permissions;
+
+        expect($teamPermissions)->toHaveCount(8); // 8 default permissions
+        expect($teamPermissions->count())->toBe($clientPermissions->count());
+
+        // Check that all default permission slugs are present
+        $teamPermissionSlugs = $teamPermissions->pluck('slug')->toArray();
+        $expectedSlugs = [
+            'teams:create', 'teams:update', 'teams:delete', 'teams:view',
+            'teamMembers:create', 'teamMembers:update', 'teamMembers:delete', 'teamMembers:view'
+        ];
+
+        foreach ($expectedSlugs as $expectedSlug) {
+            expect($teamPermissionSlugs)->toContain($expectedSlug);
+        }
     });
 });

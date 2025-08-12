@@ -86,5 +86,18 @@ class Workspace extends Model
                 $workspace->slug = self::generateUniqueSlug($workspace->name, $workspace->client_id);
             }
         });
+
+        static::created(function ($workspace) {
+            // Auto-create "Administrators" team for new workspaces
+            $adminTeam = Team::create([
+                'name' => 'Administrators',
+                'description' => 'Default administrators team with full permissions',
+                'workspace_id' => $workspace->id,
+            ]);
+
+            // Attach all client permissions to the Administrators team
+            $clientPermissions = Permission::where('client_id', $workspace->client_id)->get();
+            $adminTeam->permissions()->attach($clientPermissions->pluck('id'));
+        });
     }
 }

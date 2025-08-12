@@ -4,27 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Models\Team;
 use App\Models\Workspace;
-use App\Models\Permission;
 use App\Http\Requests\StoreTeamRequest;
 use App\Http\Requests\UpdateTeamRequest;
+use App\Services\TeamService;
+use App\Authorization\TeamAuthorization;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\ValidationException;
 
 class TeamController extends Controller
 {
-    /**
-     * Display a listing of teams for a specific workspace.
-     */
     public function index(Request $request, Workspace $workspace): JsonResponse
     {
         $this->authorize('view', $workspace);
 
-        $clientId = $this->getClientId($request);
-
-        if ($workspace->client_id !== $clientId) {
-            abort(404, 'Workspace not found');
-        }
+        $authorization = new TeamAuthorization();
+        $clientId = $authorization->getClientId($request);
+        $authorization->validateWorkspaceContext($workspace, $clientId);
 
         $teams = $workspace->teams()
             ->with('permissions')
@@ -36,36 +31,17 @@ class TeamController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created team in storage.
-     */
     public function store(StoreTeamRequest $request, Workspace $workspace): JsonResponse
     {
-        $this->authorize('update', $workspace); // Only workspace owner can create teams
+        $this->authorize('update', $workspace);
 
-        $clientId = $this->getClientId($request);
+        $authorization = new TeamAuthorization();
+        $clientId = $authorization->getClientId($request);
+        $authorization->validateWorkspaceContext($workspace, $clientId);
 
-        if ($workspace->client_id !== $clientId) {
-            abort(404, 'Workspace not found');
-        }
+        $service = new TeamService();
+        $team = $service->createTeam($workspace, $request->validated());
 
-        $validated = $request->validated();
-
-        $slug = $validated['slug'] ?? $validated['name'];
-        $uniqueSlug = Team::generateUniqueSlug($slug, $workspace->id);
-
-        $team = $workspace->teams()->create([
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'slug' => $uniqueSlug,
-        ]);
-
-        // Attach permissions if provided
-        if (!empty($validated['permission_ids'])) {
-            $team->permissions()->attach($validated['permission_ids']);
-        }
-
-        // Load the permissions relationship for response
         $team->load('permissions');
 
         return response()->json([
@@ -74,22 +50,14 @@ class TeamController extends Controller
         ], 201);
     }
 
-    /**
-     * Display the specified team.
-     */
     public function show(Request $request, Workspace $workspace, Team $team): JsonResponse
     {
         $this->authorize('view', $workspace);
 
-        $clientId = $this->getClientId($request);
-
-        if ($workspace->client_id !== $clientId) {
-            abort(404, 'Workspace not found');
-        }
-
-        if ($team->workspace_id !== $workspace->id) {
-            abort(404, 'Team not found in this workspace');
-        }
+        $authorization = new TeamAuthorization();
+        $clientId = $authorization->getClientId($request);
+        $authorization->validateWorkspaceContext($workspace, $clientId);
+        $authorization->validateTeamContext($team, $workspace);
 
         $team->load('permissions');
 
@@ -98,51 +66,18 @@ class TeamController extends Controller
         ]);
     }
 
-    /**
-     * Update the specified team in storage.
-     */
     public function update(UpdateTeamRequest $request, Workspace $workspace, Team $team): JsonResponse
     {
-        $this->authorize('update', $workspace); // Only workspace owner can update teams
+        $this->authorize('update', $workspace);
 
-        $clientId = $this->getClientId($request);
+        $authorization = new TeamAuthorization();
+        $clientId = $authorization->getClientId($request);
+        $authorization->validateWorkspaceContext($workspace, $clientId);
+        $authorization->validateTeamContext($team, $workspace);
 
-        if ($workspace->client_id !== $clientId) {
-            abort(404, 'Workspace not found');
-        }
+        $service = new TeamService();
+        $team = $service->updateTeam($team, $workspace, $request->validated());
 
-        if ($team->workspace_id !== $workspace->id) {
-            abort(404, 'Team not found in this workspace');
-        }
-
-        $validated = $request->validated();
-
-        $data = [];
-
-        if (isset($validated['name'])) {
-            $data['name'] = $validated['name'];
-        }
-
-        if (isset($validated['description'])) {
-            $data['description'] = $validated['description'];
-        }
-
-        if (isset($validated['slug'])) {
-            if ($validated['slug'] !== $team->slug) {
-                $data['slug'] = Team::generateUniqueSlug($validated['slug'], $workspace->id);
-            }
-        }
-
-        if (!empty($data)) {
-            $team->update($data);
-        }
-
-        // Update permissions if provided
-        if (isset($validated['permission_ids'])) {
-            $team->permissions()->sync($validated['permission_ids']);
-        }
-
-        // Load the permissions relationship for response
         $team->load('permissions');
 
         return response()->json([
@@ -151,82 +86,40 @@ class TeamController extends Controller
         ]);
     }
 
-    /**
-     * Remove the specified team from storage.
-     */
     public function destroy(Request $request, Workspace $workspace, Team $team): JsonResponse
     {
-        $this->authorize('update', $workspace); // Only workspace owner can delete teams
+        $this->authorize('update', $workspace);
 
-        $clientId = $this->getClientId($request);
+        $authorization = new TeamAuthorization();
+        $clientId = $authorization->getClientId($request);
+        $authorization->validateWorkspaceContext($workspace, $clientId);
+        $authorization->validateTeamContext($team, $workspace);
 
-        if ($workspace->client_id !== $clientId) {
-            abort(404, 'Workspace not found');
-        }
-
-        if ($team->workspace_id !== $workspace->id) {
-            abort(404, 'Team not found in this workspace');
-        }
-
-        $team->delete();
+        $service = new TeamService();
+        $service->deleteTeam($team);
 
         return response()->json([
             'message' => 'Team deleted successfully',
         ]);
     }
 
-    /**
-     * Get the client ID from the request token.
-     */
-    protected function getClientId(Request $request): string
-    {
-        $token = $request->user()->token();
-        $clientId = $token->client_id ?? $token->client->id ?? null;
-
-        if (!$clientId) {
-            abort(400, 'Client context not available');
-        }
-
-        return $clientId;
-    }
-
-    /**
-     * Sync permissions for a specific team.
-     */
     public function syncPermissions(Request $request, Workspace $workspace, Team $team): JsonResponse
     {
-        $this->authorize('update', $workspace); // Only workspace owner can sync permissions
+        $this->authorize('update', $workspace);
 
-        $clientId = $this->getClientId($request);
-
-        if ($workspace->client_id !== $clientId) {
-            abort(404, 'Workspace not found');
-        }
-
-        if ($team->workspace_id !== $workspace->id) {
-            abort(404, 'Team not found in this workspace');
-        }
+        $authorization = new TeamAuthorization();
+        $clientId = $authorization->getClientId($request);
+        $authorization->validateWorkspaceContext($workspace, $clientId);
+        $authorization->validateTeamContext($team, $workspace);
 
         $validated = $request->validate([
             'permission_ids' => 'required|array',
             'permission_ids.*' => 'uuid|exists:permissions,id',
         ]);
 
-        // Validate that all permissions belong to the same client
-        $invalidPermissions = Permission::whereIn('id', $validated['permission_ids'])
-            ->where('client_id', '!=', $clientId)
-            ->exists();
+        $service = new TeamService();
+        $team = $service->syncTeamPermissions($team, $validated['permission_ids'], $clientId);
 
-        if ($invalidPermissions) {
-            throw ValidationException::withMessages([
-                'permission_ids' => ['One or more permissions do not belong to this client.']
-            ]);
-        }
-
-        // Sync the permissions
-        $team->permissions()->sync($validated['permission_ids']);
-
-        // Load the permissions relationship for response
         $team->load('permissions');
 
         return response()->json([

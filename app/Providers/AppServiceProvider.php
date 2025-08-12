@@ -30,6 +30,8 @@ class AppServiceProvider extends ServiceProvider
     {
         Passport::useClientModel(Client::class);
 
+        Passport::authorizationView('auth.oauth.authorize');
+
         Vite::prefetch(concurrency: 3);
 
         if (config('app.env') === 'production') {

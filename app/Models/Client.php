@@ -3,17 +3,26 @@
 namespace App\Models;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Passport\Client as PassportClient;
 
 class Client extends PassportClient
 {
-    /**
-     * Determine if the client should skip the authorization prompt.
-     *
-     * @param  \Laravel\Passport\Scope[]  $scopes
-     */
+
     public function skipsAuthorization(Authenticatable $user, array $scopes): bool
     {
         return true;
+    }
+
+
+    public function permissions(): HasMany
+    {
+        return $this->hasMany(Permission::class);
+    }
+
+
+    public function workspaces(): HasMany
+    {
+        return $this->hasMany(Workspace::class);
     }
 }

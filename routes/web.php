@@ -28,3 +28,4 @@ Route::middleware('auth')->group(function () {
 
 require __DIR__.'/auth.php';
 require __DIR__.'/passport.php';
+require __DIR__.'/workspaces.php';

@@ -41,6 +41,9 @@ expect()->extend('toBeOne', function () {
 |
 */
 
+// Include OAuth helper functions
+require_once __DIR__ . '/Helpers/OAuthHelper.php';
+
 function something()
 {
     // ..

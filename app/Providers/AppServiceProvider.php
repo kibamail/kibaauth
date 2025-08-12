@@ -6,12 +6,16 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use App\Models\Client;
+use App\Models\Workspace;
+use App\Policies\WorkspacePolicy;
+use App\Console\Commands\CreateClientPermission;
 use Laravel\Passport\Passport;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Config;
-  use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Support\Facades\Gate;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -28,9 +32,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(Workspace::class, WorkspacePolicy::class);
+
         Passport::useClientModel(Client::class);
 
         Passport::authorizationView('auth.oauth.authorize');
+
+        // Enable password grants for testing
+        Passport::enablePasswordGrant();
 
         Vite::prefetch(concurrency: 3);
 

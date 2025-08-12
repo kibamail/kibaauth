@@ -13,13 +13,23 @@ use Illuminate\Http\JsonResponse;
 
 class TeamController extends Controller
 {
+    private TeamAuthorization $authorization;
+    private TeamService $service;
+
+    public function __construct(
+        TeamAuthorization $authorization,
+        TeamService $service
+    ) {
+        $this->authorization = $authorization;
+        $this->service = $service;
+    }
+
     public function index(Request $request, Workspace $workspace): JsonResponse
     {
         $this->authorize('view', $workspace);
 
-        $authorization = new TeamAuthorization();
-        $clientId = $authorization->getClientId($request);
-        $authorization->validateWorkspaceContext($workspace, $clientId);
+        $clientId = $this->authorization->getClientId($request);
+        $this->authorization->validateWorkspaceContext($workspace, $clientId);
 
         $teams = $workspace->teams()
             ->with('permissions')
@@ -35,12 +45,10 @@ class TeamController extends Controller
     {
         $this->authorize('update', $workspace);
 
-        $authorization = new TeamAuthorization();
-        $clientId = $authorization->getClientId($request);
-        $authorization->validateWorkspaceContext($workspace, $clientId);
+        $clientId = $this->authorization->getClientId($request);
+        $this->authorization->validateWorkspaceContext($workspace, $clientId);
 
-        $service = new TeamService();
-        $team = $service->createTeam($workspace, $request->validated());
+        $team = $this->service->createTeam($workspace, $request->validated());
 
         $team->load('permissions');
 
@@ -54,10 +62,9 @@ class TeamController extends Controller
     {
         $this->authorize('view', $workspace);
 
-        $authorization = new TeamAuthorization();
-        $clientId = $authorization->getClientId($request);
-        $authorization->validateWorkspaceContext($workspace, $clientId);
-        $authorization->validateTeamContext($team, $workspace);
+        $clientId = $this->authorization->getClientId($request);
+        $this->authorization->validateWorkspaceContext($workspace, $clientId);
+        $this->authorization->validateTeamContext($team, $workspace);
 
         $team->load('permissions');
 
@@ -70,13 +77,11 @@ class TeamController extends Controller
     {
         $this->authorize('update', $workspace);
 
-        $authorization = new TeamAuthorization();
-        $clientId = $authorization->getClientId($request);
-        $authorization->validateWorkspaceContext($workspace, $clientId);
-        $authorization->validateTeamContext($team, $workspace);
+        $clientId = $this->authorization->getClientId($request);
+        $this->authorization->validateWorkspaceContext($workspace, $clientId);
+        $this->authorization->validateTeamContext($team, $workspace);
 
-        $service = new TeamService();
-        $team = $service->updateTeam($team, $workspace, $request->validated());
+        $team = $this->service->updateTeam($team, $workspace, $request->validated());
 
         $team->load('permissions');
 
@@ -90,13 +95,11 @@ class TeamController extends Controller
     {
         $this->authorize('update', $workspace);
 
-        $authorization = new TeamAuthorization();
-        $clientId = $authorization->getClientId($request);
-        $authorization->validateWorkspaceContext($workspace, $clientId);
-        $authorization->validateTeamContext($team, $workspace);
+        $clientId = $this->authorization->getClientId($request);
+        $this->authorization->validateWorkspaceContext($workspace, $clientId);
+        $this->authorization->validateTeamContext($team, $workspace);
 
-        $service = new TeamService();
-        $service->deleteTeam($team);
+        $this->service->deleteTeam($team);
 
         return response()->json([
             'message' => 'Team deleted successfully',
@@ -107,18 +110,16 @@ class TeamController extends Controller
     {
         $this->authorize('update', $workspace);
 
-        $authorization = new TeamAuthorization();
-        $clientId = $authorization->getClientId($request);
-        $authorization->validateWorkspaceContext($workspace, $clientId);
-        $authorization->validateTeamContext($team, $workspace);
+        $clientId = $this->authorization->getClientId($request);
+        $this->authorization->validateWorkspaceContext($workspace, $clientId);
+        $this->authorization->validateTeamContext($team, $workspace);
 
         $validated = $request->validate([
             'permission_ids' => 'required|array',
             'permission_ids.*' => 'uuid|exists:permissions,id',
         ]);
 
-        $service = new TeamService();
-        $team = $service->syncTeamPermissions($team, $validated['permission_ids'], $clientId);
+        $team = $this->service->syncTeamPermissions($team, $validated['permission_ids'], $clientId);
 
         $team->load('permissions');
 

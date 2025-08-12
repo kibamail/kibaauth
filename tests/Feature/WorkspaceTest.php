@@ -8,33 +8,26 @@ use Laravel\Passport\Token;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
-
-    // Create a real client for testing
-    $this->client = Client::create([
-        'id' => (string) \Illuminate\Support\Str::uuid(),
-        'name' => 'Test Client',
-        'secret' => 'test-secret',
-        'redirect_uris' => 'http://localhost',
-        'grant_types' => 'authorization_code',
-        'revoked' => false,
-    ]);
-
-    $this->clientId = $this->client->id;
-
-    // Mock the getClientId method to return our test client ID
-    $this->partialMock(\App\Http\Controllers\WorkspaceController::class, function ($mock) {
-        $mock->shouldReceive('getClientId')
-             ->andReturn($this->clientId);
-    });
 });
+
+// Helper function to setup OAuth and workspace for workspace tests
+function setupWorkspaceTestAuth($user): array {
+    $oauthData = createOAuthHeadersForClient($user);
+    $headers = $oauthData['headers'];
+    $client = $oauthData['client'];
+
+    return compact('headers', 'client', 'user');
+}
 
 describe('Workspace API', function () {
     it('can create a workspace with authentication', function () {
-        Passport::actingAs($this->user);
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
 
         $response = $this->postJson('/api/workspaces', [
             'name' => 'Engineering Team',
-        ]);
+        ], $headers);
 
         $response->assertStatus(201)
             ->assertJsonStructure([
@@ -54,7 +47,7 @@ describe('Workspace API', function () {
                     'name' => 'Engineering Team',
                     'slug' => 'engineering-team',
                     'user_id' => $this->user->id,
-                    'client_id' => $this->clientId,
+                    'client_id' => $client->id,
                 ],
                 'message' => 'Workspace created successfully',
             ]);
@@ -63,17 +56,19 @@ describe('Workspace API', function () {
             'name' => 'Engineering Team',
             'slug' => 'engineering-team',
             'user_id' => $this->user->id,
-            'client_id' => $this->clientId,
+            'client_id' => $client->id,
         ]);
     });
 
     it('can create a workspace with custom slug', function () {
-        Passport::actingAs($this->user);
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
 
         $response = $this->postJson('/api/workspaces', [
             'name' => 'Engineering Team',
             'slug' => 'eng-team',
-        ]);
+        ], $headers);
 
         $response->assertStatus(201)
             ->assertJson([
@@ -81,7 +76,7 @@ describe('Workspace API', function () {
                     'name' => 'Engineering Team',
                     'slug' => 'eng-team',
                     'user_id' => $this->user->id,
-                    'client_id' => $this->clientId,
+                    'client_id' => $client->id,
                 ],
             ]);
 
@@ -89,22 +84,24 @@ describe('Workspace API', function () {
             'name' => 'Engineering Team',
             'slug' => 'eng-team',
             'user_id' => $this->user->id,
-            'client_id' => $this->clientId,
+            'client_id' => $client->id,
         ]);
     });
 
     it('generates unique slug when slug is already taken for same client', function () {
-        Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create([
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
+
+        Workspace::factory()->forUser($this->user)->forClient($client->id)->create([
             'name' => 'Engineering',
             'slug' => 'eng',
         ]);
 
-        Passport::actingAs($this->user);
-
         $response = $this->postJson('/api/workspaces', [
             'name' => 'Engineering Department',
             'slug' => 'eng',
-        ]);
+        ], $headers);
 
         $response->assertStatus(201)
             ->assertJson([
@@ -112,70 +109,64 @@ describe('Workspace API', function () {
                     'name' => 'Engineering Department',
                     'slug' => 'eng-2',
                     'user_id' => $this->user->id,
-                    'client_id' => $this->clientId,
+                    'client_id' => $client->id,
                 ],
             ]);
 
         $this->assertDatabaseHas('workspaces', [
             'slug' => 'eng',
-            'client_id' => $this->clientId,
+            'client_id' => $client->id,
         ]);
 
         $this->assertDatabaseHas('workspaces', [
             'slug' => 'eng-2',
             'name' => 'Engineering Department',
-            'client_id' => $this->clientId,
+            'client_id' => $client->id,
         ]);
     });
 
     it('allows same slug for different clients', function () {
-        $client2 = Client::create([
-            'id' => (string) \Illuminate\Support\Str::uuid(),
-            'name' => 'Test Client 2',
-            'secret' => 'test-secret-2',
-            'redirect_uris' => 'http://localhost',
-            'grant_types' => 'authorization_code',
-            'revoked' => false,
-        ]);
-        $client2Id = $client2->id;
+        // Setup first client and workspace
+        $authData1 = setupWorkspaceTestAuth($this->user);
+        $client1 = $authData1['client'];
 
-        Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create([
+        Workspace::factory()->forUser($this->user)->forClient($client1->id)->create([
             'name' => 'Engineering',
             'slug' => 'eng',
         ]);
 
-        // Mock controller to return second client ID
-        $this->partialMock(\App\Http\Controllers\WorkspaceController::class, function ($mock) use ($client2Id) {
-            $mock->shouldReceive('getClientId')->andReturn($client2Id);
-        });
-
-        Passport::actingAs($this->user);
+        // Setup second client with different OAuth
+        $authData2 = setupWorkspaceTestAuth($this->user);
+        $headers2 = $authData2['headers'];
+        $client2 = $authData2['client'];
 
         $response = $this->postJson('/api/workspaces', [
             'name' => 'Engineering',
             'slug' => 'eng',
-        ]);
+        ], $headers2);
 
         $response->assertStatus(201)
             ->assertJson([
                 'data' => [
                     'slug' => 'eng',
-                    'client_id' => $client2Id,
+                    'client_id' => $client2->id,
                 ],
             ]);
     });
 
     it('generates unique slug when no slug provided and name conflicts within client', function () {
-        Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create([
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
+
+        Workspace::factory()->forUser($this->user)->forClient($client->id)->create([
             'name' => 'Engineering',
             'slug' => 'engineering',
         ]);
 
-        Passport::actingAs($this->user);
-
         $response = $this->postJson('/api/workspaces', [
             'name' => 'Engineering',
-        ]);
+        ], $headers);
 
         $response->assertStatus(201)
             ->assertJson([
@@ -183,28 +174,30 @@ describe('Workspace API', function () {
                     'name' => 'Engineering',
                     'slug' => 'engineering-2',
                     'user_id' => $this->user->id,
-                    'client_id' => $this->clientId,
+                    'client_id' => $authData['client']->id,
                 ],
             ]);
     });
 
     it('handles multiple slug conflicts correctly within client', function () {
-        Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create(['slug' => 'test']);
-        Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create(['slug' => 'test-2']);
-        Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create(['slug' => 'test-3']);
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
 
-        Passport::actingAs($this->user);
+        Workspace::factory()->forUser($this->user)->forClient($client->id)->create(['slug' => 'test']);
+        Workspace::factory()->forUser($this->user)->forClient($client->id)->create(['slug' => 'test-2']);
+        Workspace::factory()->forUser($this->user)->forClient($client->id)->create(['slug' => 'test-3']);
 
         $response = $this->postJson('/api/workspaces', [
             'name' => 'Test Workspace',
             'slug' => 'test',
-        ]);
+        ], $headers);
 
         $response->assertStatus(201)
             ->assertJson([
                 'data' => [
                     'slug' => 'test-4',
-                    'client_id' => $this->clientId,
+                    'client_id' => $client->id,
                 ],
             ]);
     });
@@ -250,22 +243,21 @@ describe('Workspace API', function () {
     });
 
     it('only lists workspaces for current client', function () {
-        $client2 = Client::create([
-            'id' => (string) \Illuminate\Support\Str::uuid(),
-            'name' => 'Test Client 2',
-            'secret' => 'test-secret-2',
-            'redirect_uris' => 'http://localhost',
-            'grant_types' => 'authorization_code',
-            'revoked' => false,
-        ]);
-        $client2Id = $client2->id;
+        // Setup first client and create workspace
+        $authData1 = setupWorkspaceTestAuth($this->user);
+        $headers1 = $authData1['headers'];
+        $client1 = $authData1['client'];
 
-        $workspace1 = Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create(['name' => 'Client 1 Workspace']);
-        $workspace2 = Workspace::factory()->forUser($this->user)->forClient($client2Id)->create(['name' => 'Client 2 Workspace']);
+        $workspace1 = Workspace::factory()->forUser($this->user)->forClient($client1->id)->create(['name' => 'Client 1 Workspace']);
 
-        Passport::actingAs($this->user);
+        // Setup second client and create workspace
+        $authData2 = setupWorkspaceTestAuth($this->user);
+        $client2 = $authData2['client'];
 
-        $response = $this->getJson('/api/workspaces');
+        $workspace2 = Workspace::factory()->forUser($this->user)->forClient($client2->id)->create(['name' => 'Client 2 Workspace']);
+
+        // Test that listing workspaces only returns workspaces for current client
+        $response = $this->getJson('/api/workspaces', $headers1);
 
         $response->assertStatus(200)
             ->assertJsonCount(1, 'data');
@@ -276,14 +268,16 @@ describe('Workspace API', function () {
     });
 
     it('can show a specific workspace for current client', function () {
-        $workspace = Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create([
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
+
+        $workspace = Workspace::factory()->forUser($this->user)->forClient($client->id)->create([
             'name' => 'My Workspace',
             'slug' => 'my-workspace',
         ]);
 
-        Passport::actingAs($this->user);
-
-        $response = $this->getJson("/api/workspaces/{$workspace->id}");
+        $response = $this->getJson("/api/workspaces/{$workspace->id}", $headers);
 
         $response->assertStatus(200)
             ->assertJson([
@@ -292,54 +286,56 @@ describe('Workspace API', function () {
                     'name' => 'My Workspace',
                     'slug' => 'my-workspace',
                     'user_id' => $this->user->id,
-                    'client_id' => $this->clientId,
+                    'client_id' => $client->id,
                 ],
             ]);
     });
 
     it('cannot show workspace belonging to different client', function () {
-        $client2 = Client::create([
-            'id' => (string) \Illuminate\Support\Str::uuid(),
-            'name' => 'Test Client 2',
-            'secret' => 'test-secret-2',
-            'redirect_uris' => 'http://localhost',
-            'grant_types' => 'authorization_code',
-            'revoked' => false,
-        ]);
-        $client2Id = $client2->id;
+        // Setup first client with auth
+        $authData1 = setupWorkspaceTestAuth($this->user);
+        $headers1 = $authData1['headers'];
+        $client1 = $authData1['client'];
 
-        $workspace = Workspace::factory()->forUser($this->user)->forClient($client2Id)->create();
+        // Setup second client and create workspace there
+        $authData2 = setupWorkspaceTestAuth($this->user);
+        $client2 = $authData2['client'];
 
-        Passport::actingAs($this->user);
+        $workspace = Workspace::factory()->forUser($this->user)->forClient($client2->id)->create();
 
-        $response = $this->getJson("/api/workspaces/{$workspace->id}");
+        // Try to access workspace from different client using first client's auth
+        $response = $this->getJson("/api/workspaces/{$workspace->id}", $headers1);
 
         $response->assertStatus(404);
     });
 
     it('cannot show workspace belonging to another user', function () {
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
+
         $otherUser = User::factory()->create();
-        $workspace = Workspace::factory()->forUser($otherUser)->forClient($this->clientId)->create();
+        $workspace = Workspace::factory()->forUser($otherUser)->forClient($client->id)->create();
 
-        Passport::actingAs($this->user);
-
-        $response = $this->getJson("/api/workspaces/{$workspace->id}");
+        $response = $this->getJson("/api/workspaces/{$workspace->id}", $headers);
 
         $response->assertStatus(403);
     });
 
     it('can update a workspace for current client', function () {
-        $workspace = Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create([
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
+
+        $workspace = Workspace::factory()->forUser($this->user)->forClient($client->id)->create([
             'name' => 'Old Name',
             'slug' => 'old-slug',
         ]);
 
-        Passport::actingAs($this->user);
-
         $response = $this->putJson("/api/workspaces/{$workspace->id}", [
             'name' => 'New Name',
             'slug' => 'new-slug',
-        ]);
+        ], $headers);
 
         $response->assertStatus(200)
             ->assertJson([
@@ -348,7 +344,7 @@ describe('Workspace API', function () {
                     'name' => 'New Name',
                     'slug' => 'new-slug',
                     'user_id' => $this->user->id,
-                    'client_id' => $this->clientId,
+                    'client_id' => $client->id,
                 ],
                 'message' => 'Workspace updated successfully',
             ]);
@@ -357,70 +353,74 @@ describe('Workspace API', function () {
             'id' => $workspace->id,
             'name' => 'New Name',
             'slug' => 'new-slug',
-            'client_id' => $this->clientId,
+            'client_id' => $client->id,
         ]);
     });
 
     it('generates unique slug when updating with conflicting slug within client', function () {
-        $workspace1 = Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create(['slug' => 'existing']);
-        $workspace2 = Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create(['name' => 'Second']);
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
 
-        Passport::actingAs($this->user);
+        $workspace1 = Workspace::factory()->forUser($this->user)->forClient($client->id)->create(['slug' => 'existing']);
+        $workspace2 = Workspace::factory()->forUser($this->user)->forClient($client->id)->create(['name' => 'Second']);
 
         $response = $this->putJson("/api/workspaces/{$workspace2->id}", [
             'slug' => 'existing',
-        ]);
+        ], $headers);
 
         $response->assertStatus(200)
             ->assertJson([
                 'data' => [
                     'slug' => 'existing-2',
-                    'client_id' => $this->clientId,
+                    'client_id' => $client->id,
                 ],
             ]);
     });
 
     it('cannot update workspace belonging to different client', function () {
-        $client2 = Client::create([
-            'id' => (string) \Illuminate\Support\Str::uuid(),
-            'name' => 'Test Client 2',
-            'secret' => 'test-secret-2',
-            'redirect_uris' => 'http://localhost',
-            'grant_types' => 'authorization_code',
-            'revoked' => false,
-        ]);
-        $client2Id = $client2->id;
+        // Setup first client with auth
+        $authData1 = setupWorkspaceTestAuth($this->user);
+        $headers1 = $authData1['headers'];
+        $client1 = $authData1['client'];
 
-        $workspace = Workspace::factory()->forUser($this->user)->forClient($client2Id)->create();
+        // Setup second client and create workspace there
+        $authData2 = setupWorkspaceTestAuth($this->user);
+        $client2 = $authData2['client'];
 
-        Passport::actingAs($this->user);
+        $workspace = Workspace::factory()->forUser($this->user)->forClient($client2->id)->create();
 
+        // Try to update workspace from different client using first client's auth
         $response = $this->putJson("/api/workspaces/{$workspace->id}", [
             'name' => 'New Name',
-        ]);
+        ], $headers1);
 
         $response->assertStatus(404);
     });
 
     it('cannot update workspace belonging to another user', function () {
-        $otherUser = User::factory()->create();
-        $workspace = Workspace::factory()->forUser($otherUser)->forClient($this->clientId)->create();
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
 
-        Passport::actingAs($this->user);
+        $otherUser = User::factory()->create();
+        $workspace = Workspace::factory()->forUser($otherUser)->forClient($client->id)->create();
 
         $response = $this->putJson("/api/workspaces/{$workspace->id}", [
             'name' => 'New Name',
-        ]);
+        ], $headers);
 
         $response->assertStatus(403);
     });
 
     it('can delete a workspace for current client', function () {
-        $workspace = Workspace::factory()->forUser($this->user)->forClient($this->clientId)->create();
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
 
-        Passport::actingAs($this->user);
+        $workspace = Workspace::factory()->forUser($this->user)->forClient($client->id)->create();
 
-        $response = $this->deleteJson("/api/workspaces/{$workspace->id}");
+        $response = $this->deleteJson("/api/workspaces/{$workspace->id}", [], $headers);
 
         $response->assertStatus(200)
             ->assertJson([
@@ -433,21 +433,19 @@ describe('Workspace API', function () {
     });
 
     it('cannot delete workspace belonging to different client', function () {
-        $client2 = Client::create([
-            'id' => (string) \Illuminate\Support\Str::uuid(),
-            'name' => 'Test Client 2',
-            'secret' => 'test-secret-2',
-            'redirect_uris' => 'http://localhost',
-            'grant_types' => 'authorization_code',
-            'revoked' => false,
-        ]);
-        $client2Id = $client2->id;
+        // Setup first client with auth
+        $authData1 = setupWorkspaceTestAuth($this->user);
+        $headers1 = $authData1['headers'];
+        $client1 = $authData1['client'];
 
-        $workspace = Workspace::factory()->forUser($this->user)->forClient($client2Id)->create();
+        // Setup second client and create workspace there
+        $authData2 = setupWorkspaceTestAuth($this->user);
+        $client2 = $authData2['client'];
 
-        Passport::actingAs($this->user);
+        $workspace = Workspace::factory()->forUser($this->user)->forClient($client2->id)->create();
 
-        $response = $this->deleteJson("/api/workspaces/{$workspace->id}");
+        // Try to delete workspace from different client using first client's auth
+        $response = $this->deleteJson("/api/workspaces/{$workspace->id}", [], $headers1);
 
         $response->assertStatus(404);
 
@@ -457,12 +455,14 @@ describe('Workspace API', function () {
     });
 
     it('cannot delete workspace belonging to another user', function () {
+        $authData = setupWorkspaceTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
+
         $otherUser = User::factory()->create();
-        $workspace = Workspace::factory()->forUser($otherUser)->forClient($this->clientId)->create();
+        $workspace = Workspace::factory()->forUser($otherUser)->forClient($client->id)->create();
 
-        Passport::actingAs($this->user);
-
-        $response = $this->deleteJson("/api/workspaces/{$workspace->id}");
+        $response = $this->deleteJson("/api/workspaces/{$workspace->id}", [], $headers);
 
         $response->assertStatus(403);
 
@@ -474,7 +474,9 @@ describe('Workspace API', function () {
 
 
     it('requires authentication for all workspace endpoints', function () {
-        $workspace = Workspace::factory()->forClient($this->clientId)->create();
+        $authData = setupWorkspaceTestAuth($this->user);
+        $client = $authData['client'];
+        $workspace = Workspace::factory()->forClient($client->id)->create();
 
         $this->getJson('/api/workspaces')->assertStatus(401);
         $this->postJson('/api/workspaces')->assertStatus(401);

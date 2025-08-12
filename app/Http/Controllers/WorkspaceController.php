@@ -2,13 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Authorization\WorkspaceAuthorization;
 use App\Models\Workspace;
 use App\Http\Requests\StoreWorkspaceRequest;
+use App\Services\WorkspaceService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class WorkspaceController extends Controller
 {
+    private WorkspaceAuthorization $authorization;
+    private WorkspaceService $service;
+
+    public function __construct(
+        WorkspaceAuthorization $authorization,
+        WorkspaceService $service
+    ) {
+        $this->authorization = $authorization;
+        $this->service = $service;
+    }
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Workspace::class);
@@ -30,15 +42,10 @@ class WorkspaceController extends Controller
     {
         $this->authorize('create', Workspace::class);
 
-        $clientId = $this->getClientId($request);
-        $slug = $request->slug ?? $request->name;
-        $uniqueSlug = Workspace::generateUniqueSlug($slug, $clientId);
+        $clientId = $this->authorization->getClientId($request);
+        $user = $request->user();
 
-        $workspace = $request->user()->workspaces()->create([
-            'name' => $request->name,
-            'slug' => $uniqueSlug,
-            'client_id' => $clientId,
-        ]);
+        $workspace = $this->service->createWorkspace($user, $request->validated(), $clientId);
 
         return response()->json([
             'data' => $workspace,

@@ -2,16 +2,22 @@
 
 namespace App\Authorization;
 
+use App\Helpers\OAuthClientHelper;
 use App\Models\Team;
 use App\Models\TeamMember;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\User\UserWorkspaceService;
 use Illuminate\Http\Request;
 
 
 
 class TeamMemberAuthorization
 {
+    public function __construct(
+        protected UserWorkspaceService $workspaceService
+    ) {}
+
     public function validateContextAndAuthorization(User $user, Workspace $workspace, Team $team, string $clientId): void
     {
         // Check workspace belongs to client first
@@ -19,8 +25,7 @@ class TeamMemberAuthorization
             abort(404, 'Workspace not found');
         }
 
-        // Check authorization before context validation for better error messages
-        if (!$this->userHasPermissionInWorkspace($user, $workspace, 'teamMembers:create')) {
+        if (!$this->workspaceService->userHasPermissionInWorkspace($user, $workspace, 'teamMembers:create')) {
             abort(403, 'You do not have permission to create team members in this workspace');
         }
 
@@ -47,10 +52,9 @@ class TeamMemberAuthorization
             abort(404, 'Team member not found in this team');
         }
 
-        // Finally check authorization
         if (!$this->isWorkspaceOwner($user, $workspace) &&
             !$this->isTeamMemberSelf($user, $teamMember) &&
-            !$this->userHasPermissionInWorkspace($user, $workspace, 'teamMembers:delete')) {
+            !$this->workspaceService->userHasPermissionInWorkspace($user, $workspace, 'teamMembers:delete')) {
             abort(403, 'You are not authorized to remove this team member');
         }
     }
@@ -101,14 +105,7 @@ class TeamMemberAuthorization
 
     public function getClientId(Request $request): string
     {
-        $token = $request->user()->token();
-        $clientId = $token->client_id ?? $token->client->id ?? null;
-
-        if (!$clientId) {
-            abort(400, 'Client context not available');
-        }
-
-        return $clientId;
+        return OAuthClientHelper::getClientId($request);
     }
 
     private function isWorkspaceOwner(User $user, Workspace $workspace): bool
@@ -136,31 +133,5 @@ class TeamMemberAuthorization
         return $teamMember->team_id === $team->id;
     }
 
-    /**
-     * Check if user has specific permission in workspace through team membership
-     */
-    public function userHasPermissionInWorkspace(User $user, Workspace $workspace, string $permissionSlug): bool
-    {
-        // Check if user is workspace owner (always has all permissions)
-        if ($user->id === $workspace->user_id) {
-            return true;
-        }
 
-        // Check if user is a team member in any team that has the required permission
-        $userTeams = $workspace->teams()
-            ->whereHas('teamMembers', function ($query) use ($user) {
-                $query->where('user_id', $user->id)
-                      ->where('status', 'active');
-            })
-            ->with('permissions')
-            ->get();
-
-        foreach ($userTeams as $team) {
-            if ($team->permissions->contains('slug', $permissionSlug)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

@@ -52,5 +52,54 @@ class TeamMemberController extends Controller
         ], 200);
     }
 
+    /**
+     * Accept a team membership invitation.
+     */
+    public function acceptInvitation(Request $request, Workspace $workspace, Team $team, TeamMember $teamMember): JsonResponse
+    {
+        $clientId = $this->authorization->getClientId($request);
+        $user = $request->user();
+
+        $this->authorization->validateInvitationAuthorization($user, $workspace, $team, $teamMember, $clientId);
+
+        // Only allow accepting pending invitations
+        if ($teamMember->status !== 'pending') {
+            abort(400, 'This invitation cannot be accepted');
+        }
+
+        $teamMember = $this->service->acceptInvitation($teamMember);
+
+        if ($teamMember->user_id) {
+            $teamMember->load('user');
+        }
+
+        return response()->json([
+            'data' => $teamMember,
+            'message' => 'Team invitation accepted successfully',
+        ], 200);
+    }
+
+    /**
+     * Reject a team membership invitation.
+     */
+    public function rejectInvitation(Request $request, Workspace $workspace, Team $team, TeamMember $teamMember): JsonResponse
+    {
+        $clientId = $this->authorization->getClientId($request);
+        $user = $request->user();
+
+        $this->authorization->validateInvitationAuthorization($user, $workspace, $team, $teamMember, $clientId);
+
+        // Only allow rejecting pending invitations
+        if ($teamMember->status !== 'pending') {
+            abort(400, 'This invitation cannot be rejected');
+        }
+
+        $this->service->deleteTeamMember($teamMember);
+
+        return response()->json([
+            'message' => 'Team invitation rejected successfully',
+        ], 200);
+    }
+
 
 }

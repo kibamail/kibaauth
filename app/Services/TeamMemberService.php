@@ -37,6 +37,17 @@ class TeamMemberService
     }
 
     /**
+     * Accept a team membership invitation by changing status from pending to active.
+     */
+    public function acceptInvitation(TeamMember $teamMember): TeamMember
+    {
+        $teamMember->status = 'active';
+        $teamMember->save();
+
+        return $teamMember;
+    }
+
+    /**
      * @param array $data
      * @return array
      */

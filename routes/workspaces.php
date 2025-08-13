@@ -17,4 +17,8 @@ Route::prefix('api')->middleware('auth:api')->group(function () {
     // Team member routes
     Route::post('workspaces/{workspace}/teams/{team}/members', [TeamMemberController::class, 'store']);
     Route::delete('workspaces/{workspace}/teams/{team}/members/{teamMember}', [TeamMemberController::class, 'destroy']);
+
+    // Team invitation routes
+    Route::patch('workspaces/{workspace}/teams/{team}/members/{teamMember}/accept', [TeamMemberController::class, 'acceptInvitation']);
+    Route::delete('workspaces/{workspace}/teams/{team}/members/{teamMember}/reject', [TeamMemberController::class, 'rejectInvitation']);
 });

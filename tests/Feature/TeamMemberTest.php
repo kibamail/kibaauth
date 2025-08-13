@@ -32,6 +32,18 @@ function createTeamInWorkspaceForMembers($workspace, array $attributes = []): Te
 }
 
 describe('Team Member API', function () {
+    /**
+     * Test that verifies workspace owners can add team members to teams.
+     *
+     * This test ensures that:
+     * 1. Workspace owners have automatic permission to add team members
+     * 2. Team member creation request is processed successfully
+     * 3. The team member is properly stored in the database with correct attributes
+     * 4. The response includes the created team member data with user information
+     * 5. Team membership relationships are correctly established
+     *
+     * @test
+     */
     it('allows workspace owner to create team member', function () {
         $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
         $headers = $oauthData['headers'];
@@ -62,6 +74,18 @@ describe('Team Member API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies users with teamMembers:create permission can add team members.
+     *
+     * This test ensures that:
+     * 1. Users with teamMembers:create permission can add members even if they don't own the workspace
+     * 2. Permission-based authorization works correctly for team member creation
+     * 3. Team member addition is successful when proper permissions are granted
+     * 4. The created team member is properly associated with the team
+     * 5. Permission validation works correctly for non-owner users
+     *
+     * @test
+     */
     it('allows user with teamMembers:create permission to create team member', function () {
         // Create workspace owner
         $workspaceOwner = User::factory()->create();
@@ -112,6 +136,18 @@ describe('Team Member API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies users with teamMembers:delete permission can remove team members.
+     *
+     * This test ensures that:
+     * 1. Users with teamMembers:delete permission can remove existing team members
+     * 2. Permission-based authorization works for team member deletion
+     * 3. Team member removal is processed successfully with proper permissions
+     * 4. The team member is completely removed from the database
+     * 5. Non-owner users can delete team members with appropriate permissions
+     *
+     * @test
+     */
     it('allows user with teamMembers:delete permission to delete team member', function () {
         // Create workspace owner
         $workspaceOwner = User::factory()->create();
@@ -160,6 +196,18 @@ describe('Team Member API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies users without teamMembers:create permission cannot add team members.
+     *
+     * This test ensures that:
+     * 1. Users without teamMembers:create permission are denied team member creation access
+     * 2. Permission-based access control prevents unauthorized team member addition
+     * 3. Appropriate HTTP status codes are returned for unauthorized requests
+     * 4. Security is maintained by restricting team member creation to authorized users
+     * 5. Permission validation works correctly for team member creation endpoints
+     *
+     * @test
+     */
     it('prevents user without teamMembers:create permission from creating team member', function () {
         // Create workspace owner
         $workspaceOwner = User::factory()->create();
@@ -203,6 +251,18 @@ describe('Team Member API', function () {
         $response->assertStatus(403);
     });
 
+    /**
+     * Test that verifies users without teamMembers:delete permission cannot remove team members.
+     *
+     * This test ensures that:
+     * 1. Users without teamMembers:delete permission are denied team member deletion access
+     * 2. Permission-based access control prevents unauthorized team member removal
+     * 3. Appropriate HTTP status codes are returned for unauthorized requests
+     * 4. Security is maintained by restricting team member deletion to authorized users
+     * 5. Permission validation works correctly for team member deletion endpoints
+     *
+     * @test
+     */
     it('prevents user without teamMembers:delete permission from deleting team member', function () {
         // Create workspace owner
         $workspaceOwner = User::factory()->create();
@@ -749,6 +809,18 @@ describe('Team Member API', function () {
         $response->assertStatus(401);
     });
 
+    /**
+     * Test that verifies workspace owners can remove team members from teams.
+     *
+     * This test ensures that:
+     * 1. Workspace owners have automatic permission to remove team members
+     * 2. Team member removal request is processed successfully
+     * 3. The team member is properly removed from the database
+     * 4. Ownership-based authorization works for team member management
+     * 5. Team membership relationships are correctly terminated
+     *
+     * @test
+     */
     it('allows workspace owner to remove team member', function () {
         $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
         $headers = $oauthData['headers'];
@@ -775,6 +847,18 @@ describe('Team Member API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies team members can remove themselves from teams.
+     *
+     * This test ensures that:
+     * 1. Team members can leave teams by removing themselves
+     * 2. Self-removal is allowed regardless of other permissions
+     * 3. Users can manage their own team membership
+     * 4. Self-removal request is processed successfully
+     * 5. Team membership is properly terminated when users leave
+     *
+     * @test
+     */
     it('allows team member to remove themselves', function () {
         $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
         $client = $oauthData['client'];
@@ -805,6 +889,18 @@ describe('Team Member API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies unauthorized users cannot remove team members.
+     *
+     * This test ensures that:
+     * 1. Users without proper permissions cannot remove other team members
+     * 2. Access control prevents unauthorized team member removal
+     * 3. Only authorized users can manage team membership
+     * 4. Security is maintained by restricting team member management
+     * 5. Permission validation works correctly for team member operations
+     *
+     * @test
+     */
     it('prevents non-authorized user from removing team member', function () {
         $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
         $client = $oauthData['client'];
@@ -889,6 +985,284 @@ describe('Team Member API', function () {
         $this->assertDatabaseHas('team_members', [
             'id' => $teamMember->id,
         ]);
+    });
+
+    /**
+     * Test that verifies users can accept their own team membership invitations.
+     *
+     * This test ensures that:
+     * 1. Users can accept pending invitations for teams they were invited to
+     * 2. The invitation status changes from pending to active
+     * 3. Only the invited user can accept their own invitation
+     * 4. The response includes updated team member data
+     * 5. Invitation acceptance is properly processed and stored
+     *
+     * @test
+     */
+    it('allows user to accept their own team invitation', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $headers = $oauthData['headers'];
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+
+        $invitedUser = User::factory()->create();
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $invitedUser->id,
+            'status' => 'pending',
+        ]);
+
+        $invitedUserOauth = createOAuthHeadersForClient($invitedUser, $oauthData['client']->id);
+        $invitedUserHeaders = $invitedUserOauth['headers'];
+
+        $response = $this->withHeaders($invitedUserHeaders)
+            ->patchJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}/accept");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Team invitation accepted successfully',
+                'data' => [
+                    'id' => $teamMember->id,
+                    'team_id' => $team->id,
+                    'user_id' => $invitedUser->id,
+                    'status' => 'active',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('team_members', [
+            'id' => $teamMember->id,
+            'status' => 'active',
+        ]);
+    });
+
+    /**
+     * Test that verifies users can reject their own team membership invitations.
+     *
+     * This test ensures that:
+     * 1. Users can reject pending invitations for teams they were invited to
+     * 2. The team member record is completely removed from the database
+     * 3. Only the invited user can reject their own invitation
+     * 4. Invitation rejection is properly processed
+     * 5. The team member relationship is terminated
+     *
+     * @test
+     */
+    it('allows user to reject their own team invitation', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $headers = $oauthData['headers'];
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+
+        $invitedUser = User::factory()->create();
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $invitedUser->id,
+            'status' => 'pending',
+        ]);
+
+        $invitedUserOauth = createOAuthHeadersForClient($invitedUser, $oauthData['client']->id);
+        $invitedUserHeaders = $invitedUserOauth['headers'];
+
+        $response = $this->withHeaders($invitedUserHeaders)
+            ->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}/reject");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Team invitation rejected successfully',
+            ]);
+
+        $this->assertDatabaseMissing('team_members', [
+            'id' => $teamMember->id,
+        ]);
+    });
+
+    /**
+     * Test that verifies only the invited user can accept their invitation.
+     *
+     * This test ensures that:
+     * 1. Other users cannot accept invitations intended for different users
+     * 2. Authorization is properly enforced for invitation acceptance
+     * 3. Appropriate error responses are returned for unauthorized attempts
+     * 4. Invitation security is maintained
+     * 5. User isolation is enforced for invitation management
+     *
+     * @test
+     */
+    it('prevents other users from accepting someone elses invitation', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $headers = $oauthData['headers'];
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+
+        $invitedUser = User::factory()->create();
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $invitedUser->id,
+            'status' => 'pending',
+        ]);
+
+        $unauthorizedUser = User::factory()->create();
+        $unauthorizedOauth = createOAuthHeadersForClient($unauthorizedUser, $oauthData['client']->id);
+        $unauthorizedHeaders = $unauthorizedOauth['headers'];
+
+        $response = $this->withHeaders($unauthorizedHeaders)
+            ->patchJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}/accept");
+
+        $response->assertStatus(403);
+
+        $this->assertDatabaseHas('team_members', [
+            'id' => $teamMember->id,
+            'status' => 'pending',
+        ]);
+    });
+
+    /**
+     * Test that verifies only the invited user can reject their invitation.
+     *
+     * This test ensures that:
+     * 1. Other users cannot reject invitations intended for different users
+     * 2. Authorization is properly enforced for invitation rejection
+     * 3. Appropriate error responses are returned for unauthorized attempts
+     * 4. Invitation security is maintained
+     * 5. User isolation is enforced for invitation management
+     *
+     * @test
+     */
+    it('prevents other users from rejecting someone elses invitation', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $headers = $oauthData['headers'];
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+
+        $invitedUser = User::factory()->create();
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $invitedUser->id,
+            'status' => 'pending',
+        ]);
+
+        $unauthorizedUser = User::factory()->create();
+        $unauthorizedOauth = createOAuthHeadersForClient($unauthorizedUser, $oauthData['client']->id);
+        $unauthorizedHeaders = $unauthorizedOauth['headers'];
+
+        $response = $this->withHeaders($unauthorizedHeaders)
+            ->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}/reject");
+
+        $response->assertStatus(403);
+
+        $this->assertDatabaseHas('team_members', [
+            'id' => $teamMember->id,
+            'status' => 'pending',
+        ]);
+    });
+
+    /**
+     * Test that verifies active memberships cannot be accepted again.
+     *
+     * This test ensures that:
+     * 1. Active team memberships cannot be accepted again
+     * 2. Appropriate error messages are returned for invalid operations
+     * 3. Status validation prevents incorrect state transitions
+     * 4. Business logic prevents duplicate acceptance
+     * 5. Data integrity is maintained
+     *
+     * @test
+     */
+    it('prevents accepting already active memberships', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $headers = $oauthData['headers'];
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+
+        $invitedUser = User::factory()->create();
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $invitedUser->id,
+            'status' => 'active',
+        ]);
+
+        $memberOauth = createOAuthHeadersForClient($invitedUser, $oauthData['client']->id);
+        $memberHeaders = $memberOauth['headers'];
+
+        $response = $this->withHeaders($memberHeaders)
+            ->patchJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}/accept");
+
+        $response->assertStatus(400);
+
+        $this->assertDatabaseHas('team_members', [
+            'id' => $teamMember->id,
+            'status' => 'active',
+        ]);
+    });
+
+    /**
+     * Test that verifies active memberships cannot be rejected.
+     *
+     * This test ensures that:
+     * 1. Active team memberships cannot be rejected via the rejection endpoint
+     * 2. Appropriate error messages are returned for invalid operations
+     * 3. Status validation prevents incorrect state transitions
+     * 4. Business logic separates rejection from leaving active teams
+     * 5. Data integrity is maintained
+     *
+     * @test
+     */
+    it('prevents rejecting already active memberships', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $headers = $oauthData['headers'];
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+
+        $invitedUser = User::factory()->create();
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $invitedUser->id,
+            'status' => 'active',
+        ]);
+
+        $memberOauth = createOAuthHeadersForClient($invitedUser, $oauthData['client']->id);
+        $memberHeaders = $memberOauth['headers'];
+
+        $response = $this->withHeaders($memberHeaders)
+            ->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}/reject");
+
+        $response->assertStatus(400);
+
+        $this->assertDatabaseHas('team_members', [
+            'id' => $teamMember->id,
+            'status' => 'active',
+        ]);
+    });
+
+    /**
+     * Test that verifies invitation endpoints require authentication.
+     *
+     * This test ensures that:
+     * 1. Unauthenticated requests to invitation endpoints are rejected
+     * 2. Authentication middleware protects invitation management
+     * 3. Appropriate HTTP status codes are returned for unauthorized access
+     * 4. Security is enforced for all invitation operations
+     * 5. Authentication is required for both acceptance and rejection
+     *
+     * @test
+     */
+    it('requires authentication for invitation endpoints', function () {
+        $oauthData = setupWorkspaceAuthForTeamMembers($this->user);
+        $workspace = $oauthData['workspace'];
+        $team = createTeamInWorkspaceForMembers($workspace);
+
+        $invitedUser = User::factory()->create();
+        $teamMember = TeamMember::factory()->create([
+            'team_id' => $team->id,
+            'user_id' => $invitedUser->id,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->patchJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}/accept");
+        $response->assertStatus(401);
+
+        $response = $this->deleteJson("/api/workspaces/{$workspace->id}/teams/{$team->id}/members/{$teamMember->id}/reject");
+        $response->assertStatus(401);
     });
 
     it('returns 404 when team member does not exist', function () {

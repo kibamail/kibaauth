@@ -21,6 +21,18 @@ function setupWorkspaceTestAuth($user): array {
 }
 
 describe('Workspace API', function () {
+    /**
+     * Test that verifies authenticated users can create workspaces.
+     *
+     * This test ensures that:
+     * 1. Authenticated users can create new workspaces via POST request
+     * 2. Workspace creation request is processed successfully
+     * 3. The workspace is properly stored in the database with correct attributes
+     * 4. Auto-generated slug is created from workspace name
+     * 5. The response includes complete workspace data with proper structure
+     *
+     * @test
+     */
     it('can create a workspace with authentication', function () {
         $authData = setupWorkspaceTestAuth($this->user);
         $headers = $authData['headers'];
@@ -61,6 +73,18 @@ describe('Workspace API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies workspaces can be created with custom slugs.
+     *
+     * This test ensures that:
+     * 1. Users can specify custom slugs during workspace creation
+     * 2. Custom slugs are preserved instead of auto-generating from name
+     * 3. The workspace creation process respects provided slug values
+     * 4. Manual slug control is available when needed
+     * 5. Custom slug validation and storage works correctly
+     *
+     * @test
+     */
     it('can create a workspace with custom slug', function () {
         $authData = setupWorkspaceTestAuth($this->user);
         $headers = $authData['headers'];
@@ -89,6 +113,18 @@ describe('Workspace API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies unique slug generation when conflicts occur within the same client.
+     *
+     * This test ensures that:
+     * 1. Slug conflicts are automatically resolved for the same client
+     * 2. The system appends numbers to create unique slugs
+     * 3. Slug uniqueness is enforced within client scope
+     * 4. Multiple workspaces with similar names can coexist
+     * 5. Automatic conflict resolution works correctly
+     *
+     * @test
+     */
     it('generates unique slug when slug is already taken for same client', function () {
         $authData = setupWorkspaceTestAuth($this->user);
         $headers = $authData['headers'];
@@ -126,6 +162,18 @@ describe('Workspace API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies same slugs are allowed for different clients.
+     *
+     * This test ensures that:
+     * 1. Different clients can have workspaces with identical slugs
+     * 2. Slug uniqueness is scoped to individual clients, not globally
+     * 3. Client isolation is maintained for workspace slugs
+     * 4. Multi-tenant slug management works correctly
+     * 5. Each client has independent workspace naming
+     *
+     * @test
+     */
     it('allows same slug for different clients', function () {
         // Setup first client and workspace
         $authData1 = setupWorkspaceTestAuth($this->user);
@@ -203,6 +251,17 @@ describe('Workspace API', function () {
             ]);
     });
 
+    /**
+     * Test that verifies workspace endpoints require authentication.
+     *
+     * This test ensures that:
+     * 1. Unauthenticated requests to workspace endpoints are rejected
+     * 2. Appropriate HTTP status codes are returned for unauthorized access
+     * 3. Authentication middleware is properly protecting workspace endpoints
+     * 4. Security is enforced for all workspace operations
+     *
+     * @test
+     */
     it('requires authentication', function () {
         $response = $this->postJson('/api/workspaces', [
             'name' => 'Engineering Team',
@@ -211,6 +270,17 @@ describe('Workspace API', function () {
         $response->assertStatus(401);
     });
 
+    /**
+     * Test that verifies workspace creation validates required fields.
+     *
+     * This test ensures that:
+     * 1. Required fields are properly validated during workspace creation
+     * 2. Missing required data results in validation errors
+     * 3. Appropriate error messages are returned for validation failures
+     * 4. Data integrity is maintained through proper validation
+     *
+     * @test
+     */
     it('validates required fields', function () {
         Passport::actingAs($this->user);
 
@@ -268,6 +338,18 @@ describe('Workspace API', function () {
         expect($workspaceIds)->not->toContain($workspace2->id);
     });
 
+    /**
+     * Test that verifies users can retrieve specific workspace details.
+     *
+     * This test ensures that:
+     * 1. Users can access individual workspace details via GET request
+     * 2. Workspace data is properly returned with complete information
+     * 3. The response includes workspace attributes and relationships
+     * 4. Individual workspace access works correctly
+     * 5. Workspace owners can view their workspace details
+     *
+     * @test
+     */
     it('can show a specific workspace for current client', function () {
         $authData = setupWorkspaceTestAuth($this->user);
         $headers = $authData['headers'];
@@ -323,6 +405,18 @@ describe('Workspace API', function () {
         $response->assertStatus(403);
     });
 
+    /**
+     * Test that verifies workspace owners can update their workspaces.
+     *
+     * This test ensures that:
+     * 1. Workspace owners can modify workspace details via PUT request
+     * 2. Workspace updates are processed successfully
+     * 3. Updated data is properly saved to the database
+     * 4. The response confirms the successful update
+     * 5. Workspace modification permissions work correctly
+     *
+     * @test
+     */
     it('can update a workspace for current client', function () {
         $authData = setupWorkspaceTestAuth($this->user);
         $headers = $authData['headers'];
@@ -414,6 +508,18 @@ describe('Workspace API', function () {
         $response->assertStatus(403);
     });
 
+    /**
+     * Test that verifies workspace owners can delete their workspaces.
+     *
+     * This test ensures that:
+     * 1. Workspace owners can delete their workspaces via DELETE request
+     * 2. Workspace deletion is processed successfully
+     * 3. The workspace is completely removed from the database
+     * 4. Appropriate success messages are returned
+     * 5. Workspace deletion permissions work correctly
+     *
+     * @test
+     */
     it('can delete a workspace for current client', function () {
         $authData = setupWorkspaceTestAuth($this->user);
         $headers = $authData['headers'];

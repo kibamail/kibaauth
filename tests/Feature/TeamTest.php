@@ -36,6 +36,18 @@ function createTeamInWorkspace($workspace, array $attributes = []): Team {
 }
 
 describe('Team API', function () {
+    /**
+     * Test that verifies workspace owners can create teams in their workspaces.
+     *
+     * This test ensures that:
+     * 1. Workspace owners have automatic permission to create teams
+     * 2. Team creation request is processed successfully
+     * 3. The team is properly stored in the database with correct attributes
+     * 4. The response includes the created team data
+     * 5. Auto-generated slug is properly created from team name
+     *
+     * @test
+     */
     it('allows workspace owner to create team', function () {
         $oauthData = createOAuthHeadersForClient($this->user);
         $headers = $oauthData['headers'];
@@ -67,6 +79,18 @@ describe('Team API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies users with teams:create permission can create teams.
+     *
+     * This test ensures that:
+     * 1. Users with teams:create permission can create teams even if they don't own the workspace
+     * 2. Permission-based authorization works correctly for team creation
+     * 3. Team creation is successful when proper permissions are granted
+     * 4. The created team is properly associated with the workspace
+     * 5. Permission validation works correctly for non-owner users
+     *
+     * @test
+     */
     it('allows user with teams:create permission to create team', function () {
         // Create workspace owner
         $workspaceOwner = User::factory()->create();
@@ -112,6 +136,18 @@ describe('Team API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies users with teams:update permission can modify team details.
+     *
+     * This test ensures that:
+     * 1. Users with teams:update permission can modify existing teams
+     * 2. Team name and description can be updated successfully
+     * 3. Permission-based authorization works for team updates
+     * 4. Updated team data is properly saved to the database
+     * 5. Non-owner users can update teams with appropriate permissions
+     *
+     * @test
+     */
     it('allows user with teams:update permission to update team', function () {
         // Create workspace owner
         $workspaceOwner = User::factory()->create();
@@ -164,6 +200,18 @@ describe('Team API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies users with teams:delete permission can remove teams.
+     *
+     * This test ensures that:
+     * 1. Users with teams:delete permission can delete existing teams
+     * 2. Permission-based authorization works for team deletion
+     * 3. Team deletion is processed successfully with proper permissions
+     * 4. The team is completely removed from the database
+     * 5. Non-owner users can delete teams with appropriate permissions
+     *
+     * @test
+     */
     it('allows user with teams:delete permission to delete team', function () {
         // Create workspace owner
         $workspaceOwner = User::factory()->create();
@@ -206,6 +254,18 @@ describe('Team API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies users with teams:view permission can access team listings.
+     *
+     * This test ensures that:
+     * 1. Users with teams:view permission can retrieve lists of teams
+     * 2. Permission-based authorization works for team viewing
+     * 3. All teams in the workspace are included in the response
+     * 4. Team data includes necessary details like name, description, and slug
+     * 5. Non-owner users can view teams with appropriate permissions
+     *
+     * @test
+     */
     it('allows user with teams:view permission to view teams list', function () {
         // Create workspace owner
         $workspaceOwner = User::factory()->create();
@@ -251,6 +311,18 @@ describe('Team API', function () {
         expect($teams[0]['name'])->toBe('Administrators');
     });
 
+    /**
+     * Test that verifies users with teams:view permission can access individual team details.
+     *
+     * This test ensures that:
+     * 1. Users with teams:view permission can retrieve specific team information
+     * 2. Individual team endpoints are protected by permission-based authorization
+     * 3. Complete team data is returned for authorized users
+     * 4. Team permissions and relationships are included in the response
+     * 5. Single team access works correctly with proper permissions
+     *
+     * @test
+     */
     it('allows user with teams:view permission to view specific team', function () {
         // Create workspace owner
         $workspaceOwner = User::factory()->create();
@@ -291,6 +363,18 @@ describe('Team API', function () {
             ]);
     });
 
+    /**
+     * Test that verifies users without teams:view permission cannot access team listings.
+     *
+     * This test ensures that:
+     * 1. Users without teams:view permission are denied access to team lists
+     * 2. Permission-based access control properly restricts unauthorized access
+     * 3. Appropriate HTTP status codes are returned for unauthorized requests
+     * 4. Security is maintained by preventing unauthorized team data access
+     * 5. Permission validation works correctly for team list endpoints
+     *
+     * @test
+     */
     it('prevents user without teams:view permission from viewing teams list', function () {
         // Create workspace owner
         $workspaceOwner = User::factory()->create();
@@ -445,6 +529,18 @@ describe('Team API', function () {
         $response->assertStatus(403);
     });
 
+    /**
+     * Test that verifies users without teams:create permission cannot create teams.
+     *
+     * This test ensures that:
+     * 1. Users without teams:create permission are denied team creation access
+     * 2. Permission-based access control prevents unauthorized team creation
+     * 3. Appropriate HTTP status codes are returned for unauthorized requests
+     * 4. Security is maintained by restricting team creation to authorized users
+     * 5. Permission validation works correctly for team creation endpoints
+     *
+     * @test
+     */
     it('prevents user without teams:create permission from creating team', function () {
         // Create workspace owner
         $workspaceOwner = User::factory()->create();
@@ -657,6 +753,18 @@ describe('Team API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies non-workspace owners cannot create teams without explicit permissions.
+     *
+     * This test ensures that:
+     * 1. Users who don't own the workspace cannot create teams by default
+     * 2. Workspace ownership provides automatic team creation privileges
+     * 3. Non-owners must have explicit teams:create permission to create teams
+     * 4. Ownership-based authorization works correctly
+     * 5. Default security model prevents unauthorized team creation
+     *
+     * @test
+     */
     it('prevents non-workspace owner from creating team', function () {
         extract(setupWorkspaceAuth($this->user));
 
@@ -766,6 +874,18 @@ describe('Team API', function () {
         $response->assertStatus(404);
     });
 
+    /**
+     * Test that verifies team slugs are automatically generated from team names.
+     *
+     * This test ensures that:
+     * 1. Team slugs are automatically created when not explicitly provided
+     * 2. Slug generation follows proper URL-safe formatting rules
+     * 3. The generated slug is based on the team name
+     * 4. Auto-generation works correctly during team creation
+     * 5. Users don't need to manually specify slugs for teams
+     *
+     * @test
+     */
     it('auto-generates team slug', function () {
         extract(setupWorkspaceAuth($this->user));
 
@@ -889,6 +1009,18 @@ describe('Team API', function () {
         ]);
     });
 
+    /**
+     * Test that verifies team permissions can be synchronized/updated.
+     *
+     * This test ensures that:
+     * 1. Team permissions can be updated by providing a new set of permission IDs
+     * 2. The sync operation replaces existing permissions with the new set
+     * 3. Permission synchronization works correctly for workspace owners
+     * 4. Team permission relationships are properly managed
+     * 5. Bulk permission updates work as expected
+     *
+     * @test
+     */
     it('syncs team permissions', function () {
         extract(setupWorkspaceAuth($this->user));
 

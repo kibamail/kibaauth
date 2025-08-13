@@ -55,6 +55,29 @@ class TeamMemberAuthorization
         }
     }
 
+    public function validateInvitationAuthorization(User $user, Workspace $workspace, Team $team, TeamMember $teamMember, string $clientId): void
+    {
+        // Check workspace belongs to client first
+        if (!$this->workspaceBelongsToClient($workspace, $clientId)) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Check team belongs to workspace
+        if (!$this->teamBelongsToWorkspace($team, $workspace)) {
+            abort(403, 'You are not authorized to perform this action');
+        }
+
+        // Check team member belongs to team
+        if (!$this->teamMemberBelongsToTeam($teamMember, $team)) {
+            abort(404, 'Team member not found in this team');
+        }
+
+        // Only the user who was invited can accept/reject their own invitation
+        if (!$this->isTeamMemberSelf($user, $teamMember)) {
+            abort(403, 'You can only manage your own team invitations');
+        }
+    }
+
     public function validateWorkspaceContext(Workspace $workspace, string $clientId): void
     {
         if (!$this->workspaceBelongsToClient($workspace, $clientId)) {

@@ -66,10 +66,14 @@ class UserController extends Controller
         // Load the user data without sensitive information
         $userData = $user->only(['id', 'email', 'email_verified_at', 'created_at', 'updated_at']);
 
+        // Get client permissions
+        $clientPermissions = $this->getClientPermissions($clientId);
+
         return response()->json([
             'data' => array_merge($userData, [
                 'workspaces' => $allWorkspaces,
-                'pending_invitations' => $pendingInvitations
+                'pending_invitations' => $pendingInvitations,
+                'client_permissions' => $clientPermissions
             ])
         ]);
     }
@@ -187,5 +191,18 @@ class UserController extends Controller
             ->toArray();
 
         return $pendingInvitations;
+    }
+
+    /**
+     * Get all permissions available for the current client
+     */
+    protected function getClientPermissions(string $clientId): array
+    {
+        $permissions = \App\Models\Permission::where('client_id', $clientId)
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'description', 'created_at', 'updated_at'])
+            ->toArray();
+
+        return $permissions;
     }
 }

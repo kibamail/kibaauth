@@ -1510,6 +1510,166 @@ describe('User API', function () {
     });
 
     /**
+     * Test that verifies client permissions are included in user response.
+     *
+     * This test ensures that:
+     * 1. All permissions for the current OAuth client are included
+     * 2. Permissions are returned with complete details
+     * 3. Permissions are ordered by name for consistency
+     * 4. Only permissions for the current client are included
+     * 5. The client_permissions field is always present
+     *
+     * @test
+     */
+    it('includes client permissions in user response', function () {
+        $authData = setupUserTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
+
+        $response = $this->withHeaders($headers)->getJson('/api/user');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'data' => [
+                    'id',
+                    'email',
+                    'workspaces',
+                    'pending_invitations',
+                    'client_permissions' => [
+                        '*' => [
+                            'id',
+                            'name',
+                            'slug',
+                            'description',
+                            'created_at',
+                            'updated_at',
+                        ]
+                    ]
+                ]
+            ]);
+
+        $clientPermissions = $response->json('data.client_permissions');
+        expect($clientPermissions)->toBeArray();
+        expect($clientPermissions)->toHaveCount(8); // Default permissions count
+
+        // Verify specific permission details
+        $permissionSlugs = collect($clientPermissions)->pluck('slug')->toArray();
+        $expectedSlugs = [
+            'teams:create',
+            'teams:update',
+            'teams:delete',
+            'teams:view',
+            'teamMembers:create',
+            'teamMembers:update',
+            'teamMembers:delete',
+            'teamMembers:view'
+        ];
+
+        foreach ($expectedSlugs as $expectedSlug) {
+            expect($permissionSlugs)->toContain($expectedSlug);
+        }
+
+        // Verify permissions are ordered by name
+        $permissionNames = collect($clientPermissions)->pluck('name')->toArray();
+        $sortedNames = collect($clientPermissions)->sortBy('name')->pluck('name')->toArray();
+        expect($permissionNames)->toEqual($sortedNames);
+    });
+
+    /**
+     * Test that verifies client permissions are filtered by OAuth client.
+     *
+     * This test ensures that:
+     * 1. Only permissions for the current OAuth client are returned
+     * 2. Permissions from other clients are excluded
+     * 3. Client isolation is maintained for permission data
+     * 4. Multi-tenant security is preserved
+     * 5. Users only see permissions relevant to their current context
+     *
+     * @test
+     */
+    it('filters client permissions by OAuth client', function () {
+        $authData = setupUserTestAuth($this->user);
+        $headers = $authData['headers'];
+        $client = $authData['client'];
+
+        // Create another client with different permissions
+        $otherClient = \App\Models\Client::factory()->create();
+        \App\Models\Permission::factory()->create([
+            'client_id' => $otherClient->id,
+            'name' => 'Other Client Permission',
+            'slug' => 'other:permission',
+        ]);
+
+        // Create a custom permission for current client
+        $customPermission = \App\Models\Permission::factory()->create([
+            'client_id' => $client->id,
+            'name' => 'Custom Permission',
+            'slug' => 'custom:permission',
+        ]);
+
+        $response = $this->withHeaders($headers)->getJson('/api/user');
+
+        $response->assertStatus(200);
+
+        $clientPermissions = $response->json('data.client_permissions');
+        expect($clientPermissions)->toHaveCount(9); // 8 default + 1 custom
+
+        $permissionSlugs = collect($clientPermissions)->pluck('slug')->toArray();
+        expect($permissionSlugs)->toContain('custom:permission');
+        expect($permissionSlugs)->not->toContain('other:permission');
+
+        // Verify all permissions belong to current client
+        foreach ($clientPermissions as $permission) {
+            $dbPermission = \App\Models\Permission::find($permission['id']);
+            expect($dbPermission->client_id)->toBe($client->id);
+        }
+    });
+
+    /**
+     * Test that verifies client permissions field is present even with no custom permissions.
+     *
+     * This test ensures that:
+     * 1. Client permissions field is always present in response
+     * 2. Default permissions are included for new clients
+     * 3. The response structure is consistent
+     * 4. Empty custom permissions don't break the response
+     * 5. Default permissions are properly created for clients
+     *
+     * @test
+     */
+    it('includes default client permissions for new clients', function () {
+        // Create a fresh user with new OAuth client
+        $newUser = \App\Models\User::factory()->create();
+        $authData = setupUserTestAuth($newUser);
+        $headers = $authData['headers'];
+
+        $response = $this->withHeaders($headers)->getJson('/api/user');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'data' => [
+                    'id' => $newUser->id,
+                    'email' => $newUser->email,
+                ]
+            ]);
+
+        $clientPermissions = $response->json('data.client_permissions');
+        expect($clientPermissions)->toBeArray();
+        expect($clientPermissions)->toHaveCount(8); // Default permissions
+
+        // Verify all default permissions are present
+        $permissionSlugs = collect($clientPermissions)->pluck('slug')->toArray();
+        $defaultSlugs = [
+            'teams:create', 'teams:update', 'teams:delete', 'teams:view',
+            'teamMembers:create', 'teamMembers:update', 'teamMembers:delete', 'teamMembers:view'
+        ];
+
+        foreach ($defaultSlugs as $slug) {
+            expect($permissionSlugs)->toContain($slug);
+        }
+    });
+
+    /**
      * Test that verifies pending invitations are removed after acceptance.
      *
      * This test ensures that:

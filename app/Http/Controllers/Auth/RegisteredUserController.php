@@ -35,6 +35,8 @@ class RegisteredUserController extends Controller
             'password' => ['required', Rules\Password::defaults()],
         ]);
 
+        $clientParams = $request->session()->get('client');
+
         $user = User::create([
             'email' => $request->email,
             'password' => Hash::make($request->password),
@@ -43,6 +45,10 @@ class RegisteredUserController extends Controller
         event(new Registered($user));
 
         Auth::login($user);
+
+        if ($clientParams) {
+            $request->session()->put('client', $clientParams);
+        }
 
         return redirect(route('dashboard', absolute: false));
     }

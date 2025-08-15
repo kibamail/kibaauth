@@ -1,0 +1,47 @@
+{
+  "name": "@kibaauth/sdk",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Simple sdk to interact with the kiba auth sdk",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:watch": "vitest --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kibamail/kibaauth.git"
+  },
+  "keywords": [
+    "kibamail",
+    "kibaauth",
+    "kibaship",
+    "kibameet",
+    "kibachat"
+  ],
+  "author": "Frantz Kati <bahdcoder@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kibamail/kibaauth/issues"
+  },
+  "homepage": "https://github.com/kibamail/kibaauth#readme",
+  "dependencies": {
+    "@tszen/trycatch": "^0.1.0",
+    "axios": "^1.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.6",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

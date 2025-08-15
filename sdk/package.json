@@ -1,8 +1,8 @@
 {
-  "name": "@kibaauth/sdk",
-  "version": "1.0.0",
+  "name": "@kibamail/auth-sdk",
+  "version": "0.0.1",
   "type": "module",
-  "description": "Simple sdk to interact with the kiba auth sdk",
+  "description": "Simple sdk to interact with the kiba auth api",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -20,6 +20,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kibamail/kibaauth.git"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "keywords": [
     "kibamail",

@@ -3,7 +3,8 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
+use App\Models\Client;
 
 Route::get('/dashboard', function (Request $request) {
     $client = $request->session()->pull('client', []);
@@ -14,7 +15,12 @@ Route::get('/dashboard', function (Request $request) {
         );
     }
 
-    Log::info('Dashboard accessed', $client);
+    if ($request->user() && $request->user()->isAdministrator()) {
+        $clients = Client::all();
+        return Inertia::render('Dashboard', [
+            'clients' => $clients
+        ]);
+    }
 
     return abort(404);
 })->middleware(['auth', 'verified'])->name('dashboard');

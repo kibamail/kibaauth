@@ -26,6 +26,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'id',
         'email',
         'password',
+        'administrator',
     ];
 
     /**
@@ -49,6 +50,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'id' => 'string',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'administrator' => 'boolean',
         ];
     }
 
@@ -76,5 +78,13 @@ class User extends Authenticatable implements MustVerifyEmail
     public function teamMembers(): HasMany
     {
         return $this->hasMany(TeamMember::class);
+    }
+
+    /**
+     * Check if the user is an administrator.
+     */
+    public function isAdministrator(): bool
+    {
+        return $this->administrator;
     }
 }

@@ -24,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*'
         ]);
 
+        $middleware->alias([
+            'administrator' => \App\Http\Middleware\EnsureUserIsAdministrator::class,
+        ]);
+
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {

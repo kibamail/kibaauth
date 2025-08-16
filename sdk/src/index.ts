@@ -44,30 +44,25 @@ export type {
   RefreshTokenResponse,
 } from './Auth';
 
-export type { UserProfile } from './User';
-
-export type {
-  CreateWorkspaceRequest,
-  Permission,
-  TeamInfo,
-  UpdateWorkspaceRequest,
-  WorkspaceData,
-  WorkspaceResponse,
-  WorkspacesResponse,
-} from './Workspace';
-
 export type {
   CreateTeamMemberRequest,
   CreateTeamRequest,
-  PermissionData,
+  CreateWorkspaceRequest,
+  PendingInvitation,
+  Permission,
   SyncPermissionsRequest,
-  TeamData,
-  TeamMemberData,
+  Team as TeamData,
+  TeamMember,
   TeamMemberResponse,
   TeamResponse,
   TeamsResponse,
   UpdateTeamRequest,
-} from './Team';
+  UpdateWorkspaceRequest,
+  UserProfile,
+  Workspace as WorkspaceData,
+  WorkspaceResponse,
+  WorkspacesResponse,
+} from './types';
 
 /**
  * Default export for convenience

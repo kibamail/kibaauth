@@ -1,148 +1,15 @@
 import type { ApiClient } from './ApiClient';
-
-/**
- * Team member information interface
- */
-export interface TeamMemberData {
-  /** Team member ID */
-  id: string;
-  /** Team ID this member belongs to */
-  team_id: string;
-  /** User ID (null for email-only invitations) */
-  user_id: string | null;
-  /** Email address for invitation */
-  email: string | null;
-  /** Member status */
-  status: 'active' | 'pending';
-  /** Timestamp when member was created */
-  created_at: string;
-  /** Timestamp when member was last updated */
-  updated_at: string;
-  /** User data (if user_id is provided) */
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-  };
-}
-
-/**
- * Permission information interface
- */
-export interface PermissionData {
-  /** Permission ID */
-  id: string;
-  /** Permission name */
-  name: string;
-  /** Permission description */
-  description?: string;
-  /** Client ID this permission belongs to */
-  client_id: string;
-  /** Timestamp when permission was created */
-  created_at: string;
-  /** Timestamp when permission was last updated */
-  updated_at: string;
-}
-
-/**
- * Team information interface
- */
-export interface TeamData {
-  /** Team ID */
-  id: string;
-  /** Team name */
-  name: string;
-  /** Team description */
-  description?: string;
-  /** Team slug */
-  slug: string;
-  /** Workspace ID this team belongs to */
-  workspace_id: string;
-  /** Timestamp when team was created */
-  created_at: string;
-  /** Timestamp when team was last updated */
-  updated_at: string;
-  /** Team permissions */
-  permissions?: PermissionData[];
-  /** Team members */
-  members?: TeamMemberData[];
-}
-
-/**
- * Team creation request interface
- */
-export interface CreateTeamRequest {
-  /** Team name (required) */
-  name: string;
-  /** Team description (optional) */
-  description?: string;
-  /** Team slug (optional - will be auto-generated if not provided) */
-  slug?: string;
-  /** Permission IDs to assign to the team (optional) */
-  permission_ids?: string[];
-}
-
-/**
- * Team update request interface
- */
-export interface UpdateTeamRequest {
-  /** Team name (optional) */
-  name?: string;
-  /** Team description (optional) */
-  description?: string;
-  /** Team slug (optional) */
-  slug?: string;
-  /** Permission IDs to assign to the team (optional) */
-  permission_ids?: string[];
-}
-
-/**
- * Team member creation request interface
- */
-export interface CreateTeamMemberRequest {
-  /** User ID to add (use either user_id or email) */
-  user_id?: string;
-  /** Email address to invite (use either user_id or email) */
-  email?: string;
-  /** Member status (defaults to 'pending') */
-  status?: 'active' | 'pending';
-}
-
-/**
- * Sync permissions request interface
- */
-export interface SyncPermissionsRequest {
-  /** Array of permission IDs to sync */
-  permission_ids: string[];
-}
-
-/**
- * API response wrapper interface
- */
-export interface TeamResponse {
-  /** Response data */
-  data: TeamData;
-  /** Response message */
-  message?: string;
-}
-
-/**
- * List teams response interface
- */
-export interface TeamsResponse {
-  /** Array of teams */
-  data: TeamData[];
-}
-
-/**
- * Team member response interface
- */
-export interface TeamMemberResponse {
-  /** Response data */
-  data: TeamMemberData;
-  /** Response message */
-  message?: string;
-}
+import type {
+  CreateTeamMemberRequest,
+  CreateTeamRequest,
+  SyncPermissionsRequest,
+  Team as TeamData,
+  TeamMember as TeamMemberData,
+  TeamMemberResponse,
+  TeamResponse,
+  TeamsResponse,
+  UpdateTeamRequest,
+} from './types';
 
 /**
  * Team class for handling team-related API operations

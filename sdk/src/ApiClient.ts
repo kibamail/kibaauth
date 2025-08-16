@@ -166,6 +166,10 @@ export class ApiClient {
       };
 
       const response = await this.httpClient.get(endpoint, config);
+
+      if (response?.data?.data) {
+        return response?.data?.data;
+      }
       return response.data;
     });
 
@@ -199,6 +203,9 @@ export class ApiClient {
       };
 
       const response = await this.httpClient.post(endpoint, data, config);
+      if (response?.data?.data) {
+        return response?.data?.data;
+      }
       return response.data;
     });
 
@@ -232,6 +239,9 @@ export class ApiClient {
       };
 
       const response = await this.httpClient.put(endpoint, data, config);
+      if (response?.data?.data) {
+        return response?.data?.data;
+      }
       return response.data;
     });
 
@@ -265,6 +275,9 @@ export class ApiClient {
       };
 
       const response = await this.httpClient.patch(endpoint, data, config);
+      if (response?.data?.data) {
+        return response?.data?.data;
+      }
       return response.data;
     });
 
@@ -296,6 +309,9 @@ export class ApiClient {
       };
 
       const response = await this.httpClient.delete(endpoint, config);
+      if (response?.data?.data) {
+        return response?.data?.data;
+      }
       return response.data;
     });
 

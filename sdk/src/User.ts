@@ -1,30 +1,5 @@
 import type { ApiClient } from './ApiClient';
-
-/**
- * User profile information interface
- */
-export interface UserProfile {
-  /** User ID */
-  id: string;
-  /** User's display name */
-  name: string;
-  /** User's email address */
-  email: string;
-  /** User's avatar URL (optional) */
-  avatar?: string;
-  /** User's timezone (optional) */
-  timezone?: string;
-  /** User's locale/language preference (optional) */
-  locale?: string;
-  /** Timestamp when user was created */
-  created_at: string;
-  /** Timestamp when user was last updated */
-  updated_at: string;
-  /** Email verification status */
-  email_verified_at?: string | null;
-  /** Additional user metadata */
-  metadata?: Record<string, any>;
-}
+import type { UserProfile } from './types';
 
 /**
  * User class for handling user-related API operations
@@ -37,7 +12,7 @@ export interface UserProfile {
  * const [profile, error] = await user.profile()
  *
  * // Update user profile
- * const [updated, error] = await user.update({ name: 'New Name' })
+ * const [updated, error] = await user.update({ email: 'new@example.com' })
  * ```
  */
 export class User {
@@ -63,7 +38,9 @@ export class User {
    * if (error) {
    *   console.error('Failed to get profile:', error)
    * } else {
-   *   console.log('User:', profile.name, profile.email)
+   *   console.log('User:', profile.email)
+   *   console.log('Workspaces:', profile.workspaces.length)
+   *   console.log('Pending invitations:', profile.pending_invitations.length)
    * }
    * ```
    */
@@ -77,21 +54,18 @@ export class User {
   /**
    * Update the current user's profile information
    *
-   * @param updates - Partial user profile data to update
+   * @param updates - User profile data to update (email only)
    * @returns Promise resolving to a tuple [UserProfile | null, any]
    *
    * @example
    * ```typescript
    * const [updated, error] = await user.update({
-   *   name: 'New Name',
-   *   timezone: 'America/New_York'
+   *   email: 'newemail@example.com'
    * })
    * ```
    */
   async update(
-    updates: Partial<
-      Pick<UserProfile, 'name' | 'timezone' | 'locale' | 'metadata'>
-    >,
+    updates: Partial<Pick<UserProfile, 'email'>>,
   ): Promise<[UserProfile | null, any]> {
     if (!updates || Object.keys(updates).length === 0) {
       return [null, new Error('Updates are required')];

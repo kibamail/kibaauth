@@ -1,102 +1,11 @@
 import type { ApiClient } from './ApiClient';
-
-/**
- * Team information interface
- */
-export interface TeamInfo {
-  /** Team ID */
-  id: string;
-  /** Team name */
-  name: string;
-  /** Team description */
-  description?: string;
-  /** Workspace ID this team belongs to */
-  workspace_id: string;
-  /** Timestamp when team was created */
-  created_at: string;
-  /** Timestamp when team was last updated */
-  updated_at: string;
-  /** Team permissions */
-  permissions?: Permission[];
-}
-
-/**
- * Permission information interface
- */
-export interface Permission {
-  /** Permission ID */
-  id: string;
-  /** Permission name */
-  name: string;
-  /** Permission description */
-  description?: string;
-  /** Client ID this permission belongs to */
-  client_id: string;
-  /** Timestamp when permission was created */
-  created_at: string;
-  /** Timestamp when permission was last updated */
-  updated_at: string;
-}
-
-/**
- * Workspace information interface
- */
-export interface WorkspaceData {
-  /** Workspace ID */
-  id: string;
-  /** Workspace name */
-  name: string;
-  /** Workspace slug */
-  slug: string;
-  /** User ID who owns this workspace */
-  user_id: string;
-  /** Client ID this workspace belongs to */
-  client_id: string;
-  /** Timestamp when workspace was created */
-  created_at: string;
-  /** Timestamp when workspace was last updated */
-  updated_at: string;
-  /** Teams belonging to this workspace */
-  teams?: TeamInfo[];
-}
-
-/**
- * Workspace creation request interface
- */
-export interface CreateWorkspaceRequest {
-  /** Workspace name (required) */
-  name: string;
-  /** Workspace slug (optional - will be auto-generated if not provided) */
-  slug?: string;
-}
-
-/**
- * Workspace update request interface
- */
-export interface UpdateWorkspaceRequest {
-  /** Workspace name (optional) */
-  name?: string;
-  /** Workspace slug (optional) */
-  slug?: string;
-}
-
-/**
- * API response wrapper interface
- */
-export interface WorkspaceResponse {
-  /** Response data */
-  data: WorkspaceData;
-  /** Response message */
-  message?: string;
-}
-
-/**
- * List workspaces response interface
- */
-export interface WorkspacesResponse {
-  /** Array of workspaces */
-  data: WorkspaceData[];
-}
+import type {
+  CreateWorkspaceRequest,
+  UpdateWorkspaceRequest,
+  Workspace as WorkspaceData,
+  WorkspaceResponse,
+  WorkspacesResponse,
+} from './types';
 
 /**
  * Workspace class for handling workspace-related API operations

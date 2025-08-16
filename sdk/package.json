@@ -1,6 +1,6 @@
 {
   "name": "@kibamail/auth-sdk",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "description": "Simple sdk to interact with the kiba auth api",
   "main": "dist/index.js",
